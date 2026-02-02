@@ -5,6 +5,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
 
+from src.modules.routing.adapters.inbound.http.brs_parser import BRSParser
+from src.modules.routing.application.dto.brs import BRSRequest
 from src.modules.routing.application.ports.inbound.node.choose_node_port import (
     ChooseNodePort,
 )
@@ -31,9 +33,10 @@ class ProxyMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
 
         client: ClientSession = request.app.state.clientSession
+        brs: BRSRequest = BRSParser.parse(request)
 
         try:
-            node_id, host, port = await self.choose_node.execute()
+            node_id, host, port = await self.choose_node.execute(brs)
         except Exception as e:
             return JSONResponse(
                 {"detail": f"choose node failed: {repr(e)}"}, status_code=503

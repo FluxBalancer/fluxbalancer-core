@@ -47,8 +47,10 @@ class RoutingModule:
         self.registry = DockerNodeRegistry()
         self.weights = EntropyWeightsProvider()
 
-        algorithm_registry = AlgorithmRegistry()
-        self.strategy: RankingStrategy = algorithm_registry.get(AlgorithmName.TOPSIS)
+        self.algorithm_registry = AlgorithmRegistry()
+        self.strategy: RankingStrategy = self.algorithm_registry.get(
+            AlgorithmName.TOPSIS
+        )
 
         self.choose_node_uc = ChooseNodeUseCase(
             repo=self.repo,

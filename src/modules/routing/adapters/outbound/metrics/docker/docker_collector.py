@@ -7,7 +7,9 @@ from types import SimpleNamespace
 import aiodocker
 from aiodocker.containers import DockerContainer
 
-from src.modules.routing.adapters.outbound.metrics.snapshot_builder import MetricsSnapshotBuilder
+from src.modules.routing.adapters.outbound.metrics.snapshot_builder import (
+    MetricsSnapshotBuilder,
+)
 from src.modules.routing.application.ports.outbound.metrics.collector import (
     CollectorManager,
 )
@@ -22,6 +24,7 @@ from src.modules.routing.domain.policies.metric_extractor import MetricExtractor
 
 
 logger = logging.getLogger("docker.metrics.collector")
+
 
 async def _get_container_stats(container: DockerContainer) -> dict:
     # aiodocker возвращает список, берём [0]
@@ -48,10 +51,10 @@ class DockerMetricsCollector(CollectorManager):
     """
 
     def __init__(
-            self,
-            repo: MetricsRepository,
-            registry_updater: NodeRegistry,
-            extractors: list[MetricExtractor],
+        self,
+        repo: MetricsRepository,
+        registry_updater: NodeRegistry,
+        extractors: list[MetricExtractor],
     ):
         self.repo = repo
         self.registry_updater = registry_updater
@@ -95,9 +98,11 @@ class DockerMetricsCollector(CollectorManager):
                 )
 
             snapshot: list[dict] = MetricsSnapshotBuilder(self.repo).build()
-            logger.info({
-                "nodes": snapshot,
-            })
+            logger.info(
+                {
+                    "nodes": snapshot,
+                }
+            )
 
         finally:
             await docker.close()
