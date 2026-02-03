@@ -17,7 +17,8 @@ class BRSParser:
       - X-Replications-All (bool, опционален)
       - X-Replications-Strategy (RankingStrategy, опционален)
       - X-Balancer-Deadline (int, миллисекунды, обязателен)
-      - X-Balancer-Strategy (RankingStrategy, опционален)
+      - X-Balancer-Strategy (str, опционален)
+      X-Weights-Strategy: (str, опционален)
     """
 
     DEFAULT_REPLICATIONS = 3
@@ -43,6 +44,7 @@ class BRSParser:
         replicate_all = cls._parse_replicate_all(headers)
         replications_count = cls._parse_replications_count(headers)
         balancer_strategy = cls._parse_strategy(headers)
+        weights_strategy = cls._parse_weights_strategy(headers)
 
         return BRSRequest(
             service=service,
@@ -50,8 +52,20 @@ class BRSParser:
             replicate_all=replicate_all,
             deadline_ms=deadline_ms,
             balancer_strategy_name=balancer_strategy,
+            weights_strategy_name=weights_strategy,
             replication_strategy_name=None,
         )
+
+    @staticmethod
+    def _parse_weights_strategy(headers: Headers) -> str | None:
+        value: str | None = headers.get("X-Weights-Strategy")
+        if value is None:
+            return None
+
+        value = value.lower().strip()
+        if not value:
+            raise ValueError("BRS: X-Weights-Strategy не должен быть пустым")
+        return value
 
     @staticmethod
     def _parse_strategy(headers: Headers) -> str | None:

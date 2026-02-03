@@ -9,8 +9,8 @@ from src.modules.routing.adapters.outbound.algorithms.mcdm.lc import (
 )
 from src.modules.routing.adapters.outbound.algorithms.mcdm.saw import SAWStrategy
 from src.modules.routing.adapters.outbound.algorithms.mcdm.topsis import TopsisStrategy
-from src.modules.routing.application.ports.outbound.strategy.strategy_provider import (
-    StrategyProvider,
+from src.modules.routing.application.ports.outbound.strategy.balancer_strategy_provider import (
+    BalancerStrategyProvider,
 )
 from src.modules.routing.domain.policies.ranking_strategy import RankingStrategy
 
@@ -23,7 +23,7 @@ class AlgorithmName(StrEnum):
     LinearScalarization = "lc"
 
 
-class AlgorithmRegistry(StrategyProvider):
+class BalancerStrategyRegistry(BalancerStrategyProvider):
     def __init__(self):
         self._algos: dict[AlgorithmName, RankingStrategy] = {
             AlgorithmName.TOPSIS: TopsisStrategy(),

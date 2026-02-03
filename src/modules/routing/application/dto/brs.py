@@ -1,8 +1,5 @@
 from dataclasses import dataclass
 
-from src.modules.routing.bootstrap.algorithm_registry import AlgorithmRegistry
-from src.modules.routing.domain.policies.ranking_strategy import RankingStrategy
-
 
 @dataclass(frozen=True, slots=True)
 class BRSRequest:
@@ -21,11 +18,14 @@ class BRSRequest:
         balancer_strategy_name: Имя стратегии балансировки (идентификатор),
             используемое для разрешения стратегии через реестр.
         replication_strategy_name: Имя стратегии репликации
+        weights_strategy_name: Имя стратегии расчёта весов
     """
 
     service: str | None
     replications_count: int | None
     replicate_all: bool
     deadline_ms: int | None
+
     balancer_strategy_name: str | None
+    weights_strategy_name: str | None
     replication_strategy_name: str | None
