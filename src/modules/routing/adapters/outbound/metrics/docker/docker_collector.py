@@ -89,7 +89,7 @@ class DockerMetricsCollector(CollectorManager):
                     timestamp=NodeMetrics.now(),
                     **values,
                 )
-                self.repo.upsert(metrics)
+                await self.repo.upsert(metrics)
 
                 # обновим endpoint (host/port) через отдельный адаптер
                 port = await _get_host_port(container)
@@ -97,7 +97,7 @@ class DockerMetricsCollector(CollectorManager):
                     node_id=node_id, host="127.0.0.1", port=port
                 )
 
-            snapshot: list[dict] = MetricsSnapshotBuilder(self.repo).build()
+            snapshot: list[dict] = await MetricsSnapshotBuilder(self.repo).build()
             logger.info(
                 {
                     "nodes": snapshot,

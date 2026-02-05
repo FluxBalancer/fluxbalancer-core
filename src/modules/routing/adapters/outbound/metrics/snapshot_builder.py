@@ -8,9 +8,9 @@ class MetricsSnapshotBuilder:
     def __init__(self, repo: MetricsRepository):
         self.repo = repo
 
-    def build(self) -> list[dict]:
+    async def build(self) -> list[dict]:
         snapshot = []
-        for metric in self.repo.list_latest():
+        for metric in await self.repo.list_latest():
             metric: NodeMetrics
 
             snapshot.append(

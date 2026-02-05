@@ -50,29 +50,29 @@ class InMemoryMetricsRepository(MetricsRepository):
             latency_ms=self._latency_p95(m.node_id),
         )
 
-    def upsert(self, metrics: NodeMetrics) -> None:
+    async def upsert(self, metrics: NodeMetrics) -> None:
         with self._lock:
             self._history[metrics.node_id].append(metrics)
 
-    def get_latest(self, node_id: str) -> NodeMetrics | None:
+    async def get_latest(self, node_id: str) -> NodeMetrics | None:
         with self._lock:
             h = self._history.get(node_id)
             if not h:
                 return None
             return self._with_latency(h[-1])
 
-    def get_prev(self, node_id: str) -> NodeMetrics | None:
+    async def get_prev(self, node_id: str) -> NodeMetrics | None:
         with self._lock:
             h = self._history.get(node_id)
             if not h or len(h) < 2:
                 return None
             return self._with_latency(h[-2])
 
-    def list_latest(self) -> list[NodeMetrics]:
+    async def list_latest(self) -> list[NodeMetrics]:
         with self._lock:
             return [self._with_latency(h[-1]) for h in self._history.values() if h]
 
-    def add_latency(self, node_id: str, latency_ms: float) -> None:
+    async def add_latency(self, node_id: str, latency_ms: float) -> None:
         """
         Добавляет latency-событие для узла.
         """

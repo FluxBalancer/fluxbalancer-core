@@ -42,14 +42,14 @@ class ChooseNodeUseCase(ChooseNodePort):
         balancer_strategy: RankingStrategy = self.decision_policy.resolve_balancer(brs)
         weights_provider: WeightsProvider = self.decision_policy.resolve_weights(brs)
 
-        metrics: list[NodeMetrics] = self.metrics_repo.list_latest()
+        metrics: list[NodeMetrics] = await self.metrics_repo.list_latest()
         if not metrics:
             raise RuntimeError("Нет метрик: коллектор ещё не собрал данные")
 
         vectors: list[list[float]] = [
             m.to_vector(
                 interval=settings.collector_interval,
-                prev=self.metrics_repo.get_prev(m.node_id),
+                prev=await self.metrics_repo.get_prev(m.node_id),
             )
             for m in metrics
         ]

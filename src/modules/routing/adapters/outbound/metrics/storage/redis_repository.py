@@ -1,8 +1,7 @@
 import json
 
 import numpy as np
-from redis import Redis
-from redis.client import Pipeline
+from redis.asyncio.client import Redis
 
 from src.modules.routing.application.ports.outbound.metrics.metrics_repository import (
     MetricsRepository,
@@ -139,39 +138,38 @@ class RedisMetricsRepository(MetricsRepository):
         data = json.loads(raw)
         return NodeMetrics(**data)
 
-    def upsert(self, metrics: NodeMetrics) -> None:
+    async def upsert(self, metrics: NodeMetrics) -> None:
         """
         Сохраняет метрики узла в Redis.
 
-        Операция атомарно:
-          - обновляет последние метрики узла,
-          - добавляет запись в историю,
-          - обрезает историю до заданного лимита.
+        Операция атомарна (транзакция):
+          - обновляет последние метрики узла
+          - добавляет запись в историю
+          - обрезает историю до заданного лимита
 
         Args:
             metrics: Метрики узла для сохранения.
         """
-        pipe: Pipeline = self.redis.pipeline()
+        async with self.redis.pipeline(transaction=True) as pipe:
+            await (
+                pipe.hset(
+                    self._k_latest(metrics.node_id),
+                    mapping={
+                        "timestamp": metrics.timestamp,
+                        "node_id": metrics.node_id,
+                        "cpu_util": metrics.cpu_util,
+                        "mem_util": metrics.mem_util,
+                        "net_in_bytes": metrics.net_in_bytes,
+                        "net_out_bytes": metrics.net_out_bytes,
+                        "latency_ms": metrics.latency_ms or 0.0,
+                    },
+                )
+                .lpush(self._k_history(metrics.node_id), self._serialize(metrics))
+                .ltrim(self._k_history(metrics.node_id), 0, self.history_limit - 1)
+                .execute()
+            )
 
-        pipe.hset(
-            self._k_latest(metrics.node_id),
-            mapping={
-                "timestamp": metrics.timestamp,
-                "node_id": metrics.node_id,
-                "cpu_util": metrics.cpu_util,
-                "mem_util": metrics.mem_util,
-                "net_in_bytes": metrics.net_in_bytes,
-                "net_out_bytes": metrics.net_out_bytes,
-                "latency_ms": metrics.latency_ms or 0.0,
-            },
-        )
-
-        pipe.lpush(self._k_history(metrics.node_id), self._serialize(metrics))
-        pipe.ltrim(self._k_history(metrics.node_id), 0, self.history_limit - 1)
-
-        pipe.execute()
-
-    def add_latency(self, node_id: str, latency_ms: float) -> None:
+    async def add_latency(self, node_id: str, latency_ms: float) -> None:
         """
         Добавляет событие latency для узла.
 
@@ -182,12 +180,12 @@ class RedisMetricsRepository(MetricsRepository):
             node_id: Идентификатор узла.
             latency_ms: Задержка в миллисекундах.
         """
-        pipe = self.redis.pipeline()
-        pipe.lpush(self._k_latency(node_id), latency_ms)
-        pipe.ltrim(self._k_latency(node_id), 0, self.latency_window - 1)
-        pipe.execute()
+        async with self.redis.pipeline(transaction=True) as pipe:
+            await pipe.lpush(self._k_latency(node_id), latency_ms).ltrim(
+                self._k_latency(node_id), 0, self.latency_window - 1
+            ).execute()
 
-    def _latency_p95(self, node_id: str) -> float | None:
+    async def _latency_p95(self, node_id: str) -> float | None:
         """
         Вычисляет 95-й перцентиль latency узла.
 
@@ -198,14 +196,14 @@ class RedisMetricsRepository(MetricsRepository):
             Значение p95 latency в миллисекундах
             или None, если данных нет.
         """
-        values = self.redis.lrange(self._k_latency(node_id), 0, -1)
+        values = await self.redis.lrange(self._k_latency(node_id), 0, -1)
         if not values:
             return None
 
         arr = np.asarray([float(v) for v in values])
         return float(np.percentile(arr, 95))
 
-    def _with_latency(self, m: NodeMetrics) -> NodeMetrics:
+    async def _with_latency(self, m: NodeMetrics) -> NodeMetrics:
         """
         Обогащает метрики узла агрегированной latency.
 
@@ -222,10 +220,10 @@ class RedisMetricsRepository(MetricsRepository):
             mem_util=m.mem_util,
             net_in_bytes=m.net_in_bytes,
             net_out_bytes=m.net_out_bytes,
-            latency_ms=self._latency_p95(m.node_id),
+            latency_ms=await self._latency_p95(m.node_id),
         )
 
-    def get_latest(self, node_id: str) -> NodeMetrics | None:
+    async def get_latest(self, node_id: str) -> NodeMetrics | None:
         """
         Возвращает последние метрики узла.
 
@@ -236,7 +234,7 @@ class RedisMetricsRepository(MetricsRepository):
             Последние метрики узла или None,
             если данных нет.
         """
-        data = self.redis.hgetall(self._k_latest(node_id))
+        data = await self.redis.hgetall(self._k_latest(node_id))
         if not data:
             return None
 
@@ -250,9 +248,9 @@ class RedisMetricsRepository(MetricsRepository):
             latency_ms=float(data.get("latency_ms", 0.0)),
         )
 
-        return self._with_latency(metrics)
+        return await self._with_latency(metrics)
 
-    def get_prev(self, node_id: str) -> NodeMetrics | None:
+    async def get_prev(self, node_id: str) -> NodeMetrics | None:
         """
         Возвращает предыдущий снимок метрик узла.
 
@@ -266,13 +264,13 @@ class RedisMetricsRepository(MetricsRepository):
             Предыдущие метрики узла или None,
             если истории недостаточно.
         """
-        items = self.redis.lrange(self._k_history(node_id), 1, 1)
+        items = await self.redis.lrange(self._k_history(node_id), 1, 1)
         if not items:
             return None
 
         return self._deserialize(items[0])
 
-    def list_latest(self) -> list[NodeMetrics]:
+    async def list_latest(self) -> list[NodeMetrics]:
         """
         Возвращает последние метрики всех узлов.
 
@@ -281,9 +279,9 @@ class RedisMetricsRepository(MetricsRepository):
         """
         result: list[NodeMetrics] = []
 
-        for key in self.redis.scan_iter(f"{self.prefix}:*:latest"):
+        async for key in self.redis.scan_iter(f"{self.prefix}:*:latest"):
             node_id = key.split(":")[1]
-            metrics = self.get_latest(node_id)
+            metrics = await self.get_latest(node_id)
             if metrics:
                 result.append(metrics)
 
