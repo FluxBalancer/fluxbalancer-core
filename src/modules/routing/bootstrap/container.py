@@ -25,9 +25,13 @@ from src.modules.routing.adapters.outbound.strategy.balancer_strategy_registry i
     BalancerStrategyRegistry,
     AlgorithmName,
 )
-from src.modules.routing.adapters.outbound.strategy.weight_strategy_registry import WeightsProviderRegistry, \
-    WeightsAlgorithmName
-from src.modules.routing.application.policies.default_decision_policy_resolver import DefaultDecisionPolicyResolver
+from src.modules.routing.adapters.outbound.strategy.weight_strategy_registry import (
+    WeightsProviderRegistry,
+    WeightsAlgorithmName,
+)
+from src.modules.routing.application.policies.default_decision_policy_resolver import (
+    DefaultDecisionPolicyResolver,
+)
 from src.modules.routing.application.usecase.metrics.metrics_updater import (
     MetricsUpdater,
 )

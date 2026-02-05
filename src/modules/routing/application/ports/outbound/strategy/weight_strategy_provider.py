@@ -1,6 +1,8 @@
 from typing import Protocol
 
-from src.modules.routing.application.ports.outbound.weights.weights_provider import WeightsProvider
+from src.modules.routing.application.ports.outbound.weights.weights_provider import (
+    WeightsProvider,
+)
 
 
 class WeightStrategyProvider(Protocol):

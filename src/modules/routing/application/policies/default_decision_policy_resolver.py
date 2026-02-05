@@ -8,7 +8,9 @@ from src.modules.routing.application.ports.outbound.strategy.weight_strategy_pro
 from src.modules.routing.application.ports.outbound.weights.weights_provider import (
     WeightsProvider,
 )
-from src.modules.routing.application.ports.policies.decision_policy_resolver import DecisionPolicyResolver
+from src.modules.routing.application.ports.policies.decision_policy_resolver import (
+    DecisionPolicyResolver,
+)
 from src.modules.routing.domain.policies.ranking_strategy import RankingStrategy
 
 
@@ -20,11 +22,11 @@ class DefaultDecisionPolicyResolver(DecisionPolicyResolver):
     """
 
     def __init__(
-            self,
-            balancer_provider: BalancerStrategyProvider,
-            weights_provider: WeightStrategyProvider,
-            default_balancer: RankingStrategy,
-            default_weights: WeightsProvider,
+        self,
+        balancer_provider: BalancerStrategyProvider,
+        weights_provider: WeightStrategyProvider,
+        default_balancer: RankingStrategy,
+        default_weights: WeightsProvider,
     ):
         self.balancer_provider = balancer_provider
         self.weights_provider = weights_provider

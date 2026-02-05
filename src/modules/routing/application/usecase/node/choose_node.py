@@ -16,7 +16,9 @@ from src.modules.routing.application.ports.outbound.node.node_registry import (
 from src.modules.routing.application.ports.outbound.weights.weights_provider import (
     WeightsProvider,
 )
-from src.modules.routing.application.ports.policies.decision_policy_resolver import DecisionPolicyResolver
+from src.modules.routing.application.ports.policies.decision_policy_resolver import (
+    DecisionPolicyResolver,
+)
 from src.modules.routing.config.settings import settings
 from src.modules.routing.domain.entities.node.node_metrics import NodeMetrics
 from src.modules.routing.domain.policies.ranking_strategy import RankingStrategy
@@ -27,10 +29,10 @@ logger = logging.getLogger("decision")
 
 class ChooseNodeUseCase(ChooseNodePort):
     def __init__(
-            self,
-            metrics_repo: MetricsRepository,
-            node_registry: NodeRegistry,
-            decision_policy: DecisionPolicyResolver,
+        self,
+        metrics_repo: MetricsRepository,
+        node_registry: NodeRegistry,
+        decision_policy: DecisionPolicyResolver,
     ):
         self.metrics_repo = metrics_repo
         self.node_registry = node_registry
@@ -46,7 +48,8 @@ class ChooseNodeUseCase(ChooseNodePort):
 
         vectors: list[list[float]] = [
             m.to_vector(
-                interval=settings.collector_interval, prev=self.metrics_repo.get_prev(m.node_id)
+                interval=settings.collector_interval,
+                prev=self.metrics_repo.get_prev(m.node_id),
             )
             for m in metrics
         ]

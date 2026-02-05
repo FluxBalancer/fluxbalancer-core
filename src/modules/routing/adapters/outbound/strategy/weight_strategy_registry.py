@@ -1,8 +1,14 @@
 from enum import StrEnum
 
-from src.modules.routing.adapters.outbound.weights.weights_provider import EntropyWeightsProvider
-from src.modules.routing.application.ports.outbound.strategy.weight_strategy_provider import WeightStrategyProvider
-from src.modules.routing.application.ports.outbound.weights.weights_provider import WeightsProvider
+from src.modules.routing.adapters.outbound.weights.weights_provider import (
+    EntropyWeightsProvider,
+)
+from src.modules.routing.application.ports.outbound.strategy.weight_strategy_provider import (
+    WeightStrategyProvider,
+)
+from src.modules.routing.application.ports.outbound.weights.weights_provider import (
+    WeightsProvider,
+)
 
 
 class WeightsAlgorithmName(StrEnum):
