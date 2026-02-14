@@ -39,7 +39,15 @@ from src.modules.routing.application.usecase.metrics.metrics_updater import (
     MetricsUpdater,
 )
 from src.modules.routing.application.usecase.node.choose_node import ChooseNodeUseCase
-from src.modules.routing.application.usecase.replication.replication_manager import ReplicationManager
+from src.modules.routing.application.usecase.replication.replication_executor import (
+    ReplicationExecutor,
+)
+from src.modules.routing.application.usecase.replication.replication_manager import (
+    ReplicationManager,
+)
+from src.modules.routing.application.usecase.replication.replication_planner import (
+    ReplicationPlanner,
+)
 from src.modules.routing.config.settings import settings, MetricsBackend
 from src.modules.routing.domain.policies.replication_policy import ReplicationPolicy
 
@@ -60,7 +68,10 @@ class RoutingModule:
         self.choose_node_uc: ChooseNodePort
         self.collector: CollectorManager
         self.updater: MetricsUpdater
+
         self.replication_policy: ReplicationPolicy
+        self.replication_planner: ReplicationPlanner
+        self.replication_executor: ReplicationExecutor
         self.replication_manager: ReplicationManager
 
         self._init_repositories()
@@ -145,8 +156,16 @@ class RoutingModule:
             max_replicas=5,
         )
 
-        self.replication_manager = ReplicationManager(
+        self.replication_planner = ReplicationPlanner(
             chooser=self.choose_node_uc,
-            metrics_repo=self.metrics_repo,
             policy=self.replication_policy,
+        )
+
+        self.replication_executor = ReplicationExecutor(
+            metrics_repo=self.repo,
+        )
+
+        self.replication_manager = ReplicationManager(
+            planner=self.replication_planner,
+            executor=self.replication_executor,
         )

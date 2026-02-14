@@ -8,11 +8,11 @@ class ReplicationPolicy:
         self.max = max_replicas
 
     def resolve(
-            self,
-            available_nodes: int,
-            *,
-            replicate_all: bool = False,
-            replications_count: int | None = None,
+        self,
+        available_nodes: int,
+        *,
+        replicate_all: bool = False,
+        replications_count: int | None = None,
     ) -> int:
         if replicate_all:
             return min(available_nodes, self.max)
