@@ -41,18 +41,39 @@ class ReplicationExecutor:
         Returns:
             Response: Ответ первого успешно завершённого запроса.
         """
+        body_bytes = await request.body()
 
-        async def call(node_id, host, port):
-            start = time.perf_counter()
+        tasks = [
+            asyncio.create_task(self._call(node_id, host, port, body_bytes))
+            for node_id, host, port in plan.targets
+        ]
 
+        done, pending = await asyncio.wait(
+            tasks,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        winner = next(iter(done))
+
+        for task in pending:
+            task.cancel()
+        await asyncio.gather(*pending, return_exceptions=True)
+
+        return await winner
+
+    @staticmethod
+    async def _call(node_id, host, port, data: bytes):
+        start = time.perf_counter()
+
+        try:
             async with client.request(
-                request.method,
-                f"http://{host}:{port}{request.url.path}",
-                params=request.query_params,
-                headers=dict(request.headers),
-                data=await request.body(),
+                    request.method,
+                    f"http://{host}:{port}{request.url.path}",
+                    params=request.query_params,
+                    headers=dict(request.headers),
+                    data=data,
             ) as resp:
                 body = await resp.read()
+
                 latency = (time.perf_counter() - start) * 1000
                 await self.metrics_repo.add_latency(node_id, latency)
 
@@ -63,17 +84,6 @@ class ReplicationExecutor:
                     media_type=resp.headers.get("content-type"),
                 )
 
-        tasks = [
-            asyncio.create_task(call(node_id, host, port))
-            for node_id, host, port in plan.targets
-        ]
-
-        done, pending = await asyncio.wait(
-            tasks,
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-
-        for task in pending:
-            task.cancel()
-
-        return list(done)[0].result()
+        except asyncio.CancelledError:
+            # Очень важно — корректно пробросить отмену
+            raise
