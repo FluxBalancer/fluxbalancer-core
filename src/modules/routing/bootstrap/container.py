@@ -39,7 +39,9 @@ from src.modules.routing.application.usecase.metrics.metrics_updater import (
     MetricsUpdater,
 )
 from src.modules.routing.application.usecase.node.choose_node import ChooseNodeUseCase
+from src.modules.routing.application.usecase.replication.replication_manager import ReplicationManager
 from src.modules.routing.config.settings import settings, MetricsBackend
+from src.modules.routing.domain.policies.replication_policy import ReplicationPolicy
 
 
 class RoutingModule:
@@ -49,19 +51,32 @@ class RoutingModule:
     """
 
     def __init__(self):
+        self.metrics_repo: MetricsRepository
+        self.metrics_agg: InMemoryMetricsAggregationRepository
+        self.registry: NodeRegistry
+        self.balancer_registry: BalancerStrategyProvider
+        self.weights_registry: WeightStrategyProvider
+        self.decision_policy: DecisionPolicyResolver
+        self.choose_node_uc: ChooseNodePort
+        self.collector: CollectorManager
+        self.updater: MetricsUpdater
+        self.replication_policy: ReplicationPolicy
+        self.replication_manager: ReplicationManager
+
         self._init_repositories()
         self._init_registry()
         self._init_strategies()
         self._init_decision_policy()
+        self._init_replication_policy()
         self._init_use_cases()
 
         self._init_metrics_collector()
 
     def _init_repositories(self) -> None:
         if settings.metrics.backend is MetricsBackend.REDIS:
-            self.repo = self._create_redis_metrics_repo()
+            self.metrics_repo = self._create_redis_metrics_repo()
         else:
-            self.repo = InMemoryMetricsRepository()
+            self.metrics_repo = InMemoryMetricsRepository()
 
         self.metrics_agg = InMemoryMetricsAggregationRepository()
 
@@ -98,7 +113,7 @@ class RoutingModule:
 
     def _init_use_cases(self) -> None:
         self.choose_node_uc = ChooseNodeUseCase(
-            metrics_repo=self.repo,
+            metrics_repo=self.metrics_repo,
             node_registry=self.registry,
             decision_policy=self.decision_policy,
         )
@@ -107,7 +122,7 @@ class RoutingModule:
         extractors = self._create_metric_extractors()
 
         self.collector = DockerMetricsCollector(
-            repo=self.repo,
+            repo=self.metrics_repo,
             registry_updater=self.registry,
             extractors=extractors,
         )
@@ -123,3 +138,15 @@ class RoutingModule:
             MemoryExtractor(),
             NetworkExtractor(),
         ]
+
+    def _init_replication_policy(self):
+        self.replication_policy = ReplicationPolicy(
+            default_replicas=1,
+            max_replicas=5,
+        )
+
+        self.replication_manager = ReplicationManager(
+            chooser=self.choose_node_uc,
+            metrics_repo=self.metrics_repo,
+            policy=self.replication_policy,
+        )

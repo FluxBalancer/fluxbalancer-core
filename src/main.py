@@ -22,7 +22,10 @@ def create_app() -> FastAPI:
     )
 
     app.add_middleware(
-        ProxyMiddleware, choose_node=module.choose_node_uc, metrics_repo=module.repo
+        ProxyMiddleware,
+        choose_node=module.choose_node_uc,
+        metrics_repo=module.metrics_repo,
+        replication_manager=module.replication_manager
     )
 
     return app
