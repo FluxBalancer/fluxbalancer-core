@@ -35,6 +35,27 @@ from src.modules.routing.adapters.outbound.strategy.weight_strategy_registry imp
 from src.modules.routing.application.policies.default_decision_policy_resolver import (
     DefaultDecisionPolicyResolver,
 )
+from src.modules.routing.application.ports.inbound.node.choose_node_port import (
+    ChooseNodePort,
+)
+from src.modules.routing.application.ports.outbound.metrics.collector import (
+    CollectorManager,
+)
+from src.modules.routing.application.ports.outbound.metrics.metrics_repository import (
+    MetricsRepository,
+)
+from src.modules.routing.application.ports.outbound.node.node_registry import (
+    NodeRegistry,
+)
+from src.modules.routing.application.ports.outbound.strategy.balancer_strategy_provider import (
+    BalancerStrategyProvider,
+)
+from src.modules.routing.application.ports.outbound.strategy.weight_strategy_provider import (
+    WeightStrategyProvider,
+)
+from src.modules.routing.application.ports.policies.decision_policy_resolver import (
+    DecisionPolicyResolver,
+)
 from src.modules.routing.application.usecase.metrics.metrics_updater import (
     MetricsUpdater,
 )
@@ -78,10 +99,11 @@ class RoutingModule:
         self._init_registry()
         self._init_strategies()
         self._init_decision_policy()
-        self._init_replication_policy()
-        self._init_use_cases()
 
-        self._init_metrics_collector()
+        self._init_use_cases()
+        self._init_replication_policy()
+
+        # self._init_metrics_collector()
 
     def _init_repositories(self) -> None:
         if settings.metrics.backend is MetricsBackend.REDIS:
@@ -162,7 +184,7 @@ class RoutingModule:
         )
 
         self.replication_executor = ReplicationExecutor(
-            metrics_repo=self.repo,
+            metrics_repo=self.metrics_repo,
         )
 
         self.replication_manager = ReplicationManager(

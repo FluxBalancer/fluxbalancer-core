@@ -5,7 +5,9 @@ from contextlib import asynccontextmanager
 import aiohttp
 from fastapi import FastAPI
 
-from src.modules.routing.adapters.inbound.grpc.metrics_server import start_grpc_metrics_server
+from src.modules.routing.adapters.inbound.grpc.metrics_server import (
+    start_grpc_metrics_server,
+)
 from src.modules.routing.bootstrap.container import RoutingModule
 
 
@@ -17,12 +19,11 @@ async def lifespan(app: FastAPI, module: RoutingModule):
     )
 
     # старт фоновой задачи обновления метрик (без глобалок)
-    module.updater.start()
+    # module.updater.start()
 
     app.state.grpc_server = await start_grpc_metrics_server(
         repo=module.metrics_repo,
         registry=module.registry,
-        host="0.0.0.0",
         port=50051,
     )
 

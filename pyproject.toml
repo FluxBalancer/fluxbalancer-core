@@ -1,5 +1,5 @@
 [project]
-name = "university-research-project"
+name = "fluxbalancer-core"
 version = "0.1.0"
 description = ""
 authors = [
@@ -13,13 +13,14 @@ aiodocker = ">=0.25.0,<0.26.0"
 fastapi = ">=0.128.0,<0.129.0"
 numpy = ">=2.4.1,<3.0.0"
 python-dotenv = ">=1.2.1,<2.0.0"
+pydantic = "^2.12.5"
 pydantic-settings = ">=2.12.0,<3.0.0"
 uvicorn = ">=0.40.0,<0.41.0"
 redis = ">=7.1.0,<8.0.0"
-fluxbalancer-contracts = {path = "../fluxbalancer-contracts"}
+fluxbalancer-contracts = {git = "https://github.com/FluxBalancer/fluxbalancer-contracts.git"}
 
 [tool.poetry]
-packages = [{ include = "src" }]
+package-mode = false
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

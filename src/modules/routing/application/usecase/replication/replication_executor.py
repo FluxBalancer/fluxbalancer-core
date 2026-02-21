@@ -66,11 +66,11 @@ class ReplicationExecutor:
 
         try:
             async with client.request(
-                    request.method,
-                    f"http://{host}:{port}{request.url.path}",
-                    params=request.query_params,
-                    headers=dict(request.headers),
-                    data=data,
+                request.method,
+                f"http://{host}:{port}{request.url.path}",
+                params=request.query_params,
+                headers=dict(request.headers),
+                data=data,
             ) as resp:
                 body = await resp.read()
 

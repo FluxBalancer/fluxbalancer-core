@@ -1,50 +1,53 @@
-import grpc.aio
-from contracts.metrics import metrics_pb2, metrics_pb2_grpc
+import logging
+from dataclasses import asdict
 
-from src.modules.routing.application.ports.outbound.metrics.metrics_repository import MetricsRepository
-from src.modules.routing.application.ports.outbound.node.node_registry import NodeRegistry
+import grpc.aio
+import contracts.metrics.metrics_pb2 as metrics_pb2
+import contracts.metrics.metrics_pb2_grpc as metrics_pb2_grpc
+
+from src.modules.routing.application.ports.outbound.metrics.metrics_repository import (
+    MetricsRepository,
+)
+from src.modules.routing.application.ports.outbound.node.node_registry import (
+    NodeRegistry,
+)
 from src.modules.routing.domain.entities.node.node_metrics import NodeMetrics
+
+logger = logging.getLogger("metrics.service")
 
 
 class MetricsService(metrics_pb2_grpc.MetricsServiceServicer):
-    def __init__(
-            self,
-            repo: MetricsRepository,
-            registry: NodeRegistry
-    ):
+    def __init__(self, repo: MetricsRepository, registry: NodeRegistry):
         self.metrics_repo = repo
         self.node_registry = registry
 
-    async def PushMetrics(self, request: metrics_pb2.NodeMetricsBatch, context: grpc.aio.ServicerContext):
-        for m in request.items:
-            m: metrics_pb2.NodeMetrics
-
-            if m.host and m.port:
-                self.node_registry.update(
-                    node_id=m.node_id,
-                    host=m.host,
-                    port=m.port
-                )
-
-            node_metric = NodeMetrics(
-                timestamp=str(m.timestamp_unix_ms),
-                node_id=m.node_id,
-                cpu_util=float(m.cpu_util),
-                mem_util=float(m.mem_util),
-                net_in_bytes=int(m.net_in_bytes),
-                net_out_bytes=int(m.net_out_bytes),
-                latency_ms=float(m.latency_ms) if m.latency_ms else None,
+    async def PushMetrics(
+        self, request: metrics_pb2.NodeMetrics, context: grpc.aio.ServicerContext
+    ):
+        if request.host and request.port:
+            self.node_registry.update(
+                node_id=request.node_id, host=request.host, port=request.port
             )
-            await self.metrics_repo.upsert(node_metric)
+
+        node_metric = NodeMetrics(
+            timestamp=str(NodeMetrics.now()),
+            node_id=request.node_id,
+            cpu_util=float(request.cpu_util),
+            mem_util=float(request.mem_util),
+            net_in_bytes=int(request.net_in_bytes),
+            net_out_bytes=int(request.net_out_bytes),
+            latency_ms=float(request.latency_ms) if request.latency_ms else None,
+        )
+        logger.info({"message": "get metrics", "metrics": {**asdict(node_metric)}})
+        await self.metrics_repo.upsert(node_metric)
 
         return metrics_pb2.Ack(ok=True)
 
 
 async def start_grpc_metrics_server(
-        repo: MetricsRepository,
-        registry: NodeRegistry,
-        host: str = "0.0.0.0",
-        port: int = 50051,
+    repo: MetricsRepository,
+    registry: NodeRegistry,
+    port: int = 50051,
 ) -> grpc.aio.Server:
     server = grpc.aio.server(
         options=[
@@ -58,7 +61,8 @@ async def start_grpc_metrics_server(
     metrics_pb2_grpc.add_MetricsServiceServicer_to_server(
         MetricsService(repo, registry), server
     )
-    server.add_insecure_port(f"{host}:{port}")
+    server.add_insecure_port(f"[::]:{port}")
 
     await server.start()
+    print(f"gRPC server started on port {port}")
     return server
