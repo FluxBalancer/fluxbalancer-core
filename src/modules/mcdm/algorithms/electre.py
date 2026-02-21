@@ -7,7 +7,7 @@ _DIS_THRESHOLD: float = 0.4  # порог несогласия
 
 
 # Время выполнения: 0.001065731049 секунд
-def electre(x_matrix: Matrix, w: Vector) -> int:
+def electre(x_matrix: Matrix, w: Vector) -> Vector:
     """
     Индекс лучшего варианта по ELECTRE III (упрощённо)
     """
@@ -25,14 +25,14 @@ def electre(x_matrix: Matrix, w: Vector) -> int:
 
             # несогласие: макс относительного проигрыша
             diff: Vector = (x_matrix[i] - x_matrix[j]) / (
-                x_matrix.max(axis=0) - x_matrix.min(axis=0) + 1e-12
+                    x_matrix.max(axis=0) - x_matrix.min(axis=0) + 1e-12
             )
             discordance[i, j] = diff.max()
 
     outrank: BoolVector = (concordance >= _CONC_THRESHOLD) & (
-        discordance <= _DIS_THRESHOLD
+            discordance <= _DIS_THRESHOLD
     )
 
     # считаем число «побеждённых» каждой альтернативой
     scores: IntVector = outrank.sum(axis=1)
-    return int(np.argmax(scores))
+    return scores.astype(float)

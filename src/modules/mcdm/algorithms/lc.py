@@ -7,7 +7,7 @@ from src.modules.types.numpy import Matrix, Vector
 def lc(
     x_matrix: Matrix,
     w: Vector,
-) -> int:
+) -> Vector:
     """Выбор лучшей альтернативы методом взвешенной суммы (Linear Scalarization).
 
     Метод основан на линейной агрегации значений критериев
@@ -30,4 +30,4 @@ def lc(
     # scores_i = sum_j (x_ij * w_j)
     scores: Vector = x_matrix @ w
 
-    return int(np.argmax(scores))
+    return scores

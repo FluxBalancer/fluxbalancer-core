@@ -4,7 +4,7 @@ from src.modules.types.numpy import Matrix, Vector
 
 
 # Время выполнения: 0.000999450684 секунд
-def topsis(x_matrix: Matrix, w: Vector) -> int:
+def topsis(x_matrix: Matrix, w: Vector) -> Vector:
     """Выбор лучшей альтернативы методом TOPSIS.
 
     Все критерии рассматриваются как критерии «издержек»
@@ -48,4 +48,4 @@ def topsis(x_matrix: Matrix, w: Vector) -> int:
     )
 
     # Выбор альтернативы с максимальной близостью к идеалу
-    return int(np.argmax(C))
+    return C

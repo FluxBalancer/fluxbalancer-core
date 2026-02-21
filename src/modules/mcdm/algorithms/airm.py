@@ -12,7 +12,7 @@ def airm(
     alpha_scale: float = 5,
     benefit_mask=None,
     random_state: int | None = None,
-) -> int:
+) -> Vector:
     """Выбор лучшей альтернативы методом AIRM (Aggregated Indices Randomization Method).
 
     Метод основан на многократной рандомизации весов критериев
@@ -77,4 +77,4 @@ def airm(
         scores: Vector = x_norm @ w_rand  # агрегированный индекс
         counts[scores.argmax()] += 1  # победитель этой итерации
 
-    return int(counts.argmax())
+    return counts.astype(float) / float(n_iter)

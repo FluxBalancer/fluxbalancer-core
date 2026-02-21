@@ -1,12 +1,8 @@
-from __future__ import annotations
-
-import numpy as np
-
 from src.modules.types.numpy import Matrix, Vector
 
 
 # Время выполнения: 0.000000000000 секунд (очень быстро!)
-def saw(x_matrix: Matrix, w: Vector) -> int:
+def saw(x_matrix: Matrix, w: Vector) -> Vector:
     """Возвращает индекс лучшего варианта.
 
     Args:
@@ -19,4 +15,4 @@ def saw(x_matrix: Matrix, w: Vector) -> int:
     # Все критерии – «издержки»: меньше → лучше.
     R: Matrix = x_matrix.min(axis=0) / (x_matrix + 1e-12)
     scores: Vector = (R * w).sum(axis=1)
-    return int(np.argmax(scores))
+    return scores
