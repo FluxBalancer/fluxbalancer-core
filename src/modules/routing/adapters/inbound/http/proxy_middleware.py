@@ -40,11 +40,19 @@ class ProxyMiddleware(BaseHTTPMiddleware):
         brs: BRSRequest = BRSParser.parse(request)
 
         try:
-            # return await self.replication_manager.execute(
-            #     request=request,
-            #     brs=brs,
-            #     client=client,
-            # )
+            use_replication = (
+                brs.replicate_all
+                or brs.replications_count is not None
+                or brs.replication_strategy_name is not None
+            )
+
+            if use_replication:
+                return await self.replication_manager.execute(
+                    request=request,
+                    brs=brs,
+                    client=client,
+                )
+
             node_id, host, port = await self.choose_node.execute(brs)
         except Exception as e:
             return JSONResponse(

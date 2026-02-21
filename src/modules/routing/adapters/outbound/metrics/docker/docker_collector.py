@@ -20,7 +20,9 @@ from src.modules.routing.application.ports.outbound.node.node_registry import (
     NodeRegistry,
 )
 from src.modules.routing.domain.entities.node.node_metrics import NodeMetrics
-from src.modules.routing.domain.policies.metric_extractor import MetricExtractor
+from src.modules.routing.domain.policies.metric_extractor_policy import (
+    MetricExtractorPolicy,
+)
 
 
 logger = logging.getLogger("docker.metrics.collector")
@@ -54,7 +56,7 @@ class DockerMetricsCollector(CollectorManager):
         self,
         repo: MetricsRepository,
         registry_updater: NodeRegistry,
-        extractors: list[MetricExtractor],
+        extractors: list[MetricExtractorPolicy],
     ):
         self.repo = repo
         self.registry_updater = registry_updater

@@ -4,13 +4,13 @@ from src.modules.routing.adapters.outbound.metrics.docker.docker_collector impor
     DockerMetricsCollector,
 )
 from src.modules.routing.adapters.outbound.metrics.docker.extractors.cpu import (
-    CpuExtractor,
+    CpuExtractorPolicy,
 )
 from src.modules.routing.adapters.outbound.metrics.docker.extractors.memory import (
-    MemoryExtractor,
+    MemoryExtractorPolicy,
 )
 from src.modules.routing.adapters.outbound.metrics.docker.extractors.network import (
-    NetworkExtractor,
+    NetworkExtractorPolicy,
 )
 from src.modules.routing.adapters.outbound.metrics.storage.memory_aggregation_repository import (
     InMemoryMetricsAggregationRepository,
@@ -27,6 +27,9 @@ from src.modules.routing.adapters.outbound.registry.docker_node_registry import 
 from src.modules.routing.adapters.outbound.strategy.balancer_strategy_registry import (
     BalancerStrategyRegistry,
     AlgorithmName,
+)
+from src.modules.routing.adapters.outbound.strategy.replication_strategy_registry import (
+    ReplicationStrategyRegistry,
 )
 from src.modules.routing.adapters.outbound.strategy.weight_strategy_registry import (
     WeightsProviderRegistry,
@@ -68,6 +71,7 @@ from src.modules.routing.application.usecase.replication.replication_manager imp
 )
 from src.modules.routing.application.usecase.replication.replication_planner import (
     ReplicationPlanner,
+    PlannerConfig,
 )
 from src.modules.routing.config.settings import settings, MetricsBackend
 from src.modules.routing.domain.policies.replication_policy import ReplicationPolicy
@@ -94,6 +98,7 @@ class RoutingModule:
         self.replication_planner: ReplicationPlanner
         self.replication_executor: ReplicationExecutor
         self.replication_manager: ReplicationManager
+        self.replication_strategy_registry: ReplicationStrategyRegistry
 
         self._init_repositories()
         self._init_registry()
@@ -167,12 +172,13 @@ class RoutingModule:
 
     def _create_metric_extractors(self):
         return [
-            CpuExtractor(),
-            MemoryExtractor(),
-            NetworkExtractor(),
+            CpuExtractorPolicy(),
+            MemoryExtractorPolicy(),
+            NetworkExtractorPolicy(),
         ]
 
     def _init_replication_policy(self):
+        self.replication_strategy_registry = ReplicationStrategyRegistry()
         self.replication_policy = ReplicationPolicy(
             default_replicas=1,
             max_replicas=5,
@@ -181,6 +187,8 @@ class RoutingModule:
         self.replication_planner = ReplicationPlanner(
             chooser=self.choose_node_uc,
             policy=self.replication_policy,
+            strategy_registry=self.replication_strategy_registry,
+            config=PlannerConfig(adaptive=True, lambda_cost=1.0),
         )
 
         self.replication_executor = ReplicationExecutor(

@@ -1,7 +1,9 @@
-from src.modules.routing.domain.policies.metric_extractor import MetricExtractor
+from src.modules.routing.domain.policies.metric_extractor_policy import (
+    MetricExtractorPolicy,
+)
 
 
-class MemoryExtractor(MetricExtractor):
+class MemoryExtractorPolicy(MetricExtractorPolicy):
     def extract(self, raw_stats: dict) -> dict[str, float]:
         mem = raw_stats["memory_stats"]
         mem_util = mem["usage"] / (mem["limit"] + 1e-12)

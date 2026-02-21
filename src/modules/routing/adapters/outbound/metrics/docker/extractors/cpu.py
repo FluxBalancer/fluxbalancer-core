@@ -1,7 +1,9 @@
-from src.modules.routing.domain.policies.metric_extractor import MetricExtractor
+from src.modules.routing.domain.policies.metric_extractor_policy import (
+    MetricExtractorPolicy,
+)
 
 
-class CpuExtractor(MetricExtractor):
+class CpuExtractorPolicy(MetricExtractorPolicy):
     def extract(self, raw_stats: dict) -> dict[str, float]:
         cpu_delta = (
             raw_stats["cpu_stats"]["cpu_usage"]["total_usage"]

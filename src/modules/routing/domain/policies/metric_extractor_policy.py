@@ -1,7 +1,7 @@
 from typing import Protocol, Any
 
 
-class MetricExtractor(Protocol):
+class MetricExtractorPolicy(Protocol):
     """
     Экстрактор извлекает кусок метрик из raw docker stats.
     Добавление новой метрики = новый класс-экстрактор.

@@ -1,23 +1,37 @@
+from dataclasses import dataclass
+
+from src.modules.routing.application.dto.brs import BRSRequest
+
+
+@dataclass(slots=True)
 class ReplicationPolicy:
+    """Политика определения количества реплик.
+
+    Args:
+        default_replicas: Сколько реплик по умолчанию.
+        max_replicas: Верхняя граница.
     """
-    Определяет количество репликаций.
-    """
 
-    def __init__(self, default_replicas: int = 1, max_replicas: int = 5):
-        self.default = default_replicas
-        self.max = max_replicas
+    default_replicas: int = 1
+    max_replicas: int = 5
 
-    def resolve(
-        self,
-        available_nodes: int,
-        *,
-        replicate_all: bool = False,
-        replications_count: int | None = None,
-    ) -> int:
-        if replicate_all:
-            return min(available_nodes, self.max)
+    def resolve_count(self, brs: BRSRequest, available_nodes: int) -> int:
+        """Определяет число реплик по BRS.
 
-        if replications_count is None:
-            return min(self.default, available_nodes)
+        Args:
+            brs: DTO BRS запроса.
+            available_nodes: Сколько узлов доступно.
 
-        return min(replications_count, available_nodes, self.max)
+        Returns:
+            Число реплик r (>=1).
+        """
+        if available_nodes <= 0:
+            return 0
+
+        if brs.replicate_all:
+            return min(available_nodes, self.max_replicas)
+
+        if brs.replications_count is None:
+            return min(self.default_replicas, available_nodes)
+
+        return min(brs.replications_count, available_nodes, self.max_replicas)
