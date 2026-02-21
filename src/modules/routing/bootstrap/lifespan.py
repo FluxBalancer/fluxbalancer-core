@@ -32,6 +32,6 @@ async def lifespan(app: FastAPI, module: RoutingModule):
     # TODO: aclose redis
 
     await app.state.clientSession.close()
-    await module.updater.stop()
+    # await module.updater.stop()
 
     await app.state.grpc_server.stop(grace=2)

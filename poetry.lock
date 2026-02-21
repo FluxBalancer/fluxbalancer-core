@@ -352,7 +352,7 @@ standard-no-fastapi-cloud-cli = ["email-validator (>=2.0.0)", "fastapi-cli[stand
 
 [[package]]
 name = "fluxbalancer-contracts"
-version = "0.1.2"
+version = "0.1.4"
 description = ""
 optional = false
 python-versions = ">=3.12"
@@ -368,7 +368,7 @@ protobuf = ">=6.33.5,<7.0.0"
 type = "git"
 url = "https://github.com/FluxBalancer/fluxbalancer-contracts.git"
 reference = "HEAD"
-resolved_reference = "20c3b4c2a22fbb13422c4e80b40ddfc6cc9786aa"
+resolved_reference = "4e7bb47ac66860fd9dc0e52fb8cb7349bac8ea20"
 
 [[package]]
 name = "frozenlist"

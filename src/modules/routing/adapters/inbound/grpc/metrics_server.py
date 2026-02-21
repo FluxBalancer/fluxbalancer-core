@@ -24,9 +24,12 @@ class MetricsService(metrics_pb2_grpc.MetricsServiceServicer):
     async def PushMetrics(
         self, request: metrics_pb2.NodeMetrics, context: grpc.aio.ServicerContext
     ):
-        if request.host and request.port:
+        peer: str = context.peer()
+        ip: str = peer.split(":")[1]
+
+        if ip and request.port:
             self.node_registry.update(
-                node_id=request.node_id, host=request.host, port=request.port
+                node_id=request.node_id, host=ip, port=request.port
             )
 
         node_metric = NodeMetrics(
@@ -36,7 +39,6 @@ class MetricsService(metrics_pb2_grpc.MetricsServiceServicer):
             mem_util=float(request.mem_util),
             net_in_bytes=int(request.net_in_bytes),
             net_out_bytes=int(request.net_out_bytes),
-            latency_ms=float(request.latency_ms) if request.latency_ms else None,
         )
         logger.info({"message": "get metrics", "metrics": {**asdict(node_metric)}})
         await self.metrics_repo.upsert(node_metric)
