@@ -2,28 +2,30 @@ import logging
 
 import numpy as np
 
-from src.modules.routing.application.dto.brs import BRSRequest
-from src.modules.routing.application.ports.choose_node_port import (
-    ChooseNodePort,
+from modules.discovery.application.ports.outbound.node_registry import (
+    NodeRegistry,
+)
+from modules.gateway.application.dto.brs import BRSRequest
+from modules.decision.domain.policies.decision_resolver_policy import (
+    DecisionResolverPolicy,
+)
+from src.modules.decision.domain.ranking_strategy import RankingStrategy
+from src.modules.decision.domain.weights_strategy import (
+    WeightsStrategy,
 )
 from src.modules.observability.application.ports.metrics_repository import (
     MetricsRepository,
 )
-from src.modules.discovery.application.ports.node_registry import (
-    NodeRegistry,
-)
-from src.modules.decision.domain.weights_strategy import (
-    WeightsStrategy,
-)
-from src.modules.decision.application.decision_policy_resolver import (
-    DecisionPolicyResolver,
+from src.modules.observability.domain.node_metrics import NodeMetrics
+from src.modules.routing.application.ports.choose_node_port import (
+    ChooseNodePort,
 )
 from src.modules.routing.config.settings import settings
-from src.modules.observability.domain.node_metrics import NodeMetrics
-from src.modules.decision.domain.ranking_strategy import RankingStrategy
 from src.modules.types.numpy import Vector, Matrix
 
 logger = logging.getLogger("decision")
+
+SLA_MAX_LATENCY_MS = 500
 
 
 class ChooseNodeUseCase(ChooseNodePort):
@@ -31,7 +33,7 @@ class ChooseNodeUseCase(ChooseNodePort):
         self,
         metrics_repo: MetricsRepository,
         node_registry: NodeRegistry,
-        decision_policy: DecisionPolicyResolver,
+        decision_policy: DecisionResolverPolicy,
     ):
         self.metrics_repo = metrics_repo
         self.node_registry = node_registry
@@ -63,6 +65,7 @@ class ChooseNodeUseCase(ChooseNodePort):
         vectors: list[list[float]] = [
             m.to_vector(
                 interval=settings.collector_interval,
+                sla_latency_ms=SLA_MAX_LATENCY_MS,
                 prev=await self.metrics_repo.get_prev(m.node_id),
             )
             for m in metrics

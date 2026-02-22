@@ -8,7 +8,7 @@ import contracts.metrics.metrics_pb2_grpc as metrics_pb2_grpc
 from src.modules.observability.application.ports.metrics_repository import (
     MetricsRepository,
 )
-from src.modules.discovery.application.ports.node_registry import (
+from modules.discovery.application.ports.outbound.node_registry import (
     NodeRegistry,
 )
 from src.modules.observability.domain.node_metrics import NodeMetrics

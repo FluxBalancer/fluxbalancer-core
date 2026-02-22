@@ -3,8 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-SLA_MAX_LATENCY_MS = 500
-
 
 @dataclass(frozen=True)
 class NodeMetrics:
@@ -17,12 +15,17 @@ class NodeMetrics:
     latency_ms: float | None = None
 
     def to_vector(
-        self, interval: float, prev: NodeMetrics | None = None, nic_gbps: int = 1
+        self,
+        interval: float,
+        sla_latency_ms: float,
+        prev: NodeMetrics | None = None,
+        nic_gbps: int = 1,
     ) -> list[float]:
         """Преобразует метрику в числовой вектор для MCDM.
 
         Args:
             prev: Предыдущий снимок той же ноды.
+            sla_latency_ms:
             interval: Шаг измерения (секунды).
             nic_gbps: Пропускная способность сетевого интерфейса.
 
@@ -42,7 +45,7 @@ class NodeMetrics:
         nic_Bps = nic_gbps * 125_000_000  # 1 Gb/s = 125 MB/s
         net_util = min(net_Bps / nic_Bps, 1.0)  # clamp в [0,1]
 
-        lat: float = (self.latency_ms or 0.0) / SLA_MAX_LATENCY_MS
+        lat: float = (self.latency_ms or 0.0) / sla_latency_ms
 
         return [cpu, mem, net_util, lat]
 

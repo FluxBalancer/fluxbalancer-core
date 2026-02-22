@@ -1,40 +1,59 @@
-from src.modules.decision.application.decision_policy_resolver import (
-    DecisionPolicyResolver,
+from aiohttp import ClientSession
+
+from modules.decision.adapters.outbound.registries.balancer_strategy_registry import (
+    BalancerStrategyRegistry,
+    AlgorithmName,
 )
-from src.modules.decision.application.ports.balancer_strategy_provider import (
-    BalancerStrategyProvider,
+from modules.decision.adapters.outbound.registries.weight_strategy_registry import (
+    WeightsProviderRegistry,
+    WeightsAlgorithmName,
 )
-from src.modules.decision.application.ports.weight_strategy_provider import (
-    WeightStrategyProvider,
+from modules.decision.application.services.default_decision_resolver import (
+    DefaultDecisionResolver,
 )
-from src.modules.observability.adapters.docker.docker_collector import (
-    DockerMetricsCollector,
+from modules.decision.application.ports.outbound.strategy_provider import (
+    StrategyProvider,
 )
-from src.modules.observability.adapters.docker.extractors.network import (
-    NetworkExtractorPolicy,
+from modules.decision.domain.ranking_strategy import RankingStrategy
+from modules.decision.domain.weights_strategy import WeightsStrategy
+from modules.discovery.adapters.memory_node_registry import InMemoryNodeRegistry
+from modules.discovery.application.ports.outbound.node_registry import NodeRegistry
+from modules.gateway.application.use_cases.proxy_request import ProxyRequestUseCase
+from modules.observability.adapters.outbound.replication_latency_recorder import (
+    MetricsRepositoryLatencyRecorder,
 )
-from src.modules.observability.adapters.storage.memory_aggregation_repository import (
+from modules.observability.adapters.outbound.storage.memory_aggregation_repository import (
     InMemoryMetricsAggregationRepository,
 )
-from src.modules.observability.application.ports.collector import CollectorManager
-from src.modules.observability.application.ports.metrics_repository import (
-    MetricsRepository,
+from modules.observability.adapters.outbound.storage.memory_repository import (
+    InMemoryMetricsRepository,
 )
-from src.modules.observability.application.usecase.metrics_updater import MetricsUpdater
-from src.modules.replication.adapters.registries.replication_strategy_registry import (
+from modules.observability.adapters.outbound.storage.redis_repository import (
+    RedisMetricsRepository,
+)
+from modules.replication.adapters.outbound.http.aiohttp_replication_runner import (
+    AiohttpReplicationRunner,
+)
+from modules.replication.adapters.outbound.registry.replication_strategy_registry import (
     ReplicationStrategyRegistry,
 )
-from src.modules.replication.application.replication_executor import (
-    ReplicationExecutor,
+from modules.replication.application.ports.outbound.latency_recorder import (
+    LatencyRecorder,
 )
-from src.modules.replication.application.replication_manager import (
-    ReplicationManager,
-)
-from src.modules.replication.application.replication_planner import (
+from modules.replication.application.services.replication_planner import (
     ReplicationPlanner,
     PlannerConfig,
 )
-from src.modules.replication.domain.replication_policy import ReplicationPolicy
+from modules.replication.domain.policies.replication_policy import ReplicationPolicy
+from modules.decision.domain.policies.decision_resolver_policy import (
+    DecisionResolverPolicy,
+)
+from src.modules.observability.application.ports.metrics_repository import (
+    MetricsRepository,
+)
+from modules.replication.application.services.replication_manager import (
+    ReplicationManager,
+)
 from src.modules.routing.application.ports.choose_node_port import (
     ChooseNodePort,
 )
@@ -51,37 +70,58 @@ class RoutingModule:
     def __init__(self):
         self.metrics_repo: MetricsRepository
         self.metrics_agg: InMemoryMetricsAggregationRepository
+        self.latency_recorder: LatencyRecorder
+
         self.registry: NodeRegistry
-        self.balancer_registry: BalancerStrategyProvider
-        self.weights_registry: WeightStrategyProvider
-        self.decision_policy: DecisionPolicyResolver
+        self.balancer_registry: StrategyProvider[RankingStrategy]
+        self.weights_registry: StrategyProvider[WeightsStrategy]
+
+        self.decision_policy: DecisionResolverPolicy
         self.choose_node_uc: ChooseNodePort
-        self.collector: CollectorManager
-        self.updater: MetricsUpdater
 
         self.replication_policy: ReplicationPolicy
         self.replication_planner: ReplicationPlanner
-        self.replication_executor: ReplicationExecutor
-        self.replication_manager: ReplicationManager
+        self.replication_executor: AiohttpReplicationRunner = None
+        self.replication_manager: ReplicationManager = None
         self.replication_strategy_registry: ReplicationStrategyRegistry
 
+        self.proxy_use_case: ProxyRequestUseCase = None
+
         self._init_repositories()
-        self._init_registry()
-        self._init_strategies()
+        self._init_node_registry()
+        self._init_registries()
         self._init_decision_policy()
 
         self._init_use_cases()
         self._init_replication_policy()
 
-        # self._init_metrics_collector()
+    async def init_async(self, client_session: ClientSession):
+        self.replication_executor = AiohttpReplicationRunner(
+            client=client_session,
+            latency_recorder=self.latency_recorder,
+        )
+
+        self.replication_manager = ReplicationManager(
+            planner=self.replication_planner,
+            executor=self.replication_executor,
+        )
+
+        self.proxy_use_case = ProxyRequestUseCase(
+            choose_node=self.choose_node_uc,
+            replication_manager=self.replication_manager,
+            metrics_repo=self.metrics_repo,
+            client=client_session,
+        )
 
     def _init_repositories(self) -> None:
+        self.metrics_agg = InMemoryMetricsAggregationRepository()
+
         if settings.metrics.backend is MetricsBackend.REDIS:
             self.metrics_repo = self._create_redis_metrics_repo()
         else:
             self.metrics_repo = InMemoryMetricsRepository()
 
-        self.metrics_agg = InMemoryMetricsAggregationRepository()
+        self.latency_recorder = MetricsRepositoryLatencyRecorder(repo=self.metrics_repo)
 
     def _create_redis_metrics_repo(self) -> RedisMetricsRepository:
         import redis.asyncio as redis
@@ -99,15 +139,21 @@ class RoutingModule:
             latency_window=cfg.latency_window,
         )
 
-    def _init_registry(self) -> None:
+    async def close_redis_if_exist(self) -> None:
+        if settings.metrics.backend is MetricsBackend.REDIS and isinstance(
+            self.metrics_repo, RedisMetricsRepository
+        ):
+            await self.metrics_repo.redis.aclose()
+
+    def _init_node_registry(self) -> None:
         self.registry = InMemoryNodeRegistry()
 
-    def _init_strategies(self) -> None:
+    def _init_registries(self) -> None:
         self.balancer_registry = BalancerStrategyRegistry()
         self.weights_registry = WeightsProviderRegistry()
 
     def _init_decision_policy(self) -> None:
-        self.decision_policy = DefaultDecisionPolicyResolver(
+        self.decision_policy = DefaultDecisionResolver(
             balancer_provider=self.balancer_registry,
             weights_provider=self.weights_registry,
             default_balancer=self.balancer_registry.get(AlgorithmName.TOPSIS),
@@ -120,27 +166,6 @@ class RoutingModule:
             node_registry=self.registry,
             decision_policy=self.decision_policy,
         )
-
-    def _init_metrics_collector(self) -> None:
-        extractors = self._create_metric_extractors()
-
-        self.collector = DockerMetricsCollector(
-            repo=self.metrics_repo,
-            registry_updater=self.registry,
-            extractors=extractors,
-        )
-
-        self.updater = MetricsUpdater(
-            collector=self.collector,
-            collector_interval=settings.collector_interval,
-        )
-
-    def _create_metric_extractors(self):
-        return [
-            CpuExtractorPolicy(),
-            MemoryExtractorPolicy(),
-            NetworkExtractorPolicy(),
-        ]
 
     def _init_replication_policy(self):
         self.replication_strategy_registry = ReplicationStrategyRegistry()
@@ -156,11 +181,5 @@ class RoutingModule:
             config=PlannerConfig(adaptive=True, lambda_cost=1.0),
         )
 
-        self.replication_executor = ReplicationExecutor(
-            metrics_repo=self.metrics_repo,
-        )
-
-        self.replication_manager = ReplicationManager(
-            planner=self.replication_planner,
-            executor=self.replication_executor,
-        )
+        self.replication_executor = None
+        self.replication_manager = None

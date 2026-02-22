@@ -1,9 +1,9 @@
 import uvicorn
 from fastapi import FastAPI
 
+from modules.gateway.adapters.inbound.http.proxy_middleware import ProxyMiddleware
+from modules.gateway.adapters.inbound.http.router import ChooseNodeRouter
 from src.logging_config import setup_logging
-from src.modules.gateway.inbound.http.proxy_middleware import ProxyMiddleware
-from src.modules.gateway.inbound.http.router import ChooseNodeRouter
 from src.modules.routing.bootstrap.container import RoutingModule
 from src.modules.routing.bootstrap.lifespan import lifespan
 
@@ -15,18 +15,9 @@ def create_app() -> FastAPI:
 
     app = FastAPI(lifespan=lambda app_: lifespan(app_, module))
 
-    app.include_router(
-        ChooseNodeRouter(
-            choose_node=module.choose_node_uc, metrics_agg_repo=module.metrics_agg
-        ).router
-    )
+    app.include_router(ChooseNodeRouter(metrics_agg_repo=module.metrics_agg).router)
 
-    app.add_middleware(
-        ProxyMiddleware,
-        choose_node=module.choose_node_uc,
-        metrics_repo=module.metrics_repo,
-        replication_manager=module.replication_manager,
-    )
+    app.add_middleware(ProxyMiddleware, proxy_use_case=module.proxy_use_case)
 
     return app
 

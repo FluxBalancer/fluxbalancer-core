@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 from contextlib import asynccontextmanager
 
 import aiohttp
@@ -14,12 +12,10 @@ from src.modules.routing.bootstrap.container import RoutingModule
 @asynccontextmanager
 async def lifespan(app: FastAPI, module: RoutingModule):
     app.state.clientSession = aiohttp.ClientSession(
-        connector=aiohttp.TCPConnector(limit=200, ttl_dns_cache=300),
+        connector=aiohttp.TCPConnector(limit=1000, ttl_dns_cache=300),
         timeout=aiohttp.ClientTimeout(total=30),
     )
-
-    # старт фоновой задачи обновления метрик (без глобалок)
-    # module.updater.start()
+    await module.init_async(app.state.clientSession)
 
     app.state.grpc_server = await start_grpc_metrics_server(
         repo=module.metrics_repo,
@@ -29,9 +25,6 @@ async def lifespan(app: FastAPI, module: RoutingModule):
 
     yield
 
-    # TODO: aclose redis
-
+    await module.close_redis_if_exist()
     await app.state.clientSession.close()
-    # await module.updater.stop()
-
     await app.state.grpc_server.stop(grace=2)

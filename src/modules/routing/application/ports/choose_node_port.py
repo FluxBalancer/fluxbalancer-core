@@ -1,6 +1,6 @@
 from typing import Protocol
 
-from src.modules.routing.application.dto.brs import BRSRequest
+from modules.gateway.application.dto.brs import BRSRequest
 
 
 class ChooseNodePort(Protocol):

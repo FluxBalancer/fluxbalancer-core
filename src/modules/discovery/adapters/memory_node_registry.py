@@ -1,16 +1,9 @@
 from threading import RLock
 
-from src.modules.routing.application.ports.outbound.node.node_registry import (
-    NodeRegistry,
-)
+from modules.discovery.application.ports.outbound.node_registry import NodeRegistry
 
 
-class DockerNodeRegistry(NodeRegistry):
-    """
-    Память + обновление из Docker collector'а.
-    Потом легко заменить на Redis / файл.
-    """
-
+class InMemoryNodeRegistry(NodeRegistry):
     def __init__(self):
         self._lock = RLock()
         self._endpoints: dict[str, tuple[str, int]] = {}
