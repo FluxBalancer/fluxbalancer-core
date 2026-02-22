@@ -1,12 +1,12 @@
 from dataclasses import dataclass
 
 from src.modules.replication.algorithms.fixed_wa import FixedWAEstimator
+from src.modules.replication.domain.replication_plan import ReplicationPlan
 from src.modules.routing.application.dto.brs import BRSRequest
 from src.modules.routing.application.usecase.node.choose_node import ChooseNodeUseCase
 from src.modules.routing.domain.policies.adaptive_replication_selector_policy import (
     AdaptiveReplicationSelector,
 )
-from src.modules.routing.domain.policies.replication.base import ReplicationPlan
 from src.modules.routing.domain.policies.replication_policy import ReplicationPolicy
 
 

@@ -35,6 +35,7 @@ class BalancerStrategyRegistry(BalancerStrategyProvider):
 
     def get(self, name: str):
         try:
-            return self._algos[name]
-        except KeyError:
-            raise ValueError(f"Неизвестный алгоритм: {name}")
+            key = AlgorithmName(name.strip().lower())
+            return self._algos[key]
+        except (Exception, KeyError) as e:
+            raise ValueError(f"Неизвестный алгоритм: {name}") from e

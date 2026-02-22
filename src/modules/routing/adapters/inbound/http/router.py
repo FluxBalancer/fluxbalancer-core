@@ -17,11 +17,6 @@ class ChooseNodeRouter:
     ):
         self.router = APIRouter()
 
-        @self.router.get("/choose")
-        async def choose():
-            node_id, host, port = await choose_node.execute()
-            return {"host": host, "port": port}
-
         @self.router.get("/stats")
         async def stats():
             """Сводные метрики по задержкам и ресурсам."""

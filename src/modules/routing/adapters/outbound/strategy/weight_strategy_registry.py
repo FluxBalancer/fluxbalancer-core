@@ -24,6 +24,7 @@ class WeightsProviderRegistry(WeightStrategyProvider):
 
     def get(self, name: str) -> WeightsProvider:
         try:
-            return self._providers[name]
-        except KeyError:
-            raise ValueError(f"Неизвестный алгоритм весов: {name}")
+            key = WeightsAlgorithmName(name.strip().lower())
+            return self._providers[key]
+        except (Exception, KeyError) as e:
+            raise ValueError(f"Неизвестный алгоритм весов: {name}") from e

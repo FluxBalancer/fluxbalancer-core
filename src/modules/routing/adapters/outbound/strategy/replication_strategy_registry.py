@@ -37,7 +37,9 @@ class ReplicationStrategyRegistry:
     def get(self, name: str | None) -> ReplicationStrategy:
         if name is None:
             return self._map[ReplicationAlgorithmName.FIXED]
+
         try:
-            return self._map[name]
-        except KeyError as e:
+            key = ReplicationAlgorithmName(name.strip().lower())
+            return self._map[key]
+        except (Exception, KeyError) as e:
             raise ValueError(f"Неизвестная стратегия репликации: {name}") from e
