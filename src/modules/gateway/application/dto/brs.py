@@ -11,14 +11,19 @@ class BRSRequest:
 
     Attributes:
         service: Название сервиса, к которому относится запрос.
+
+        balancer_strategy_name: Имя стратегии балансировки (идентификатор),
+            используемое для разрешения стратегии через реестр.
+        weights_strategy_name: Имя стратегии расчёта весов.
+
+        replication_strategy_name: Имя стратегии репликации.
         replications_count: Количество репликаций запроса.
             Если None — количество определяется балансировщиком.
         replicate_all: Признак репликации запроса на все доступные узлы сервиса.
         deadline_ms: Дедлайн выполнения запроса в миллисекундах.
-        balancer_strategy_name: Имя стратегии балансировки (идентификатор),
-            используемое для разрешения стратегии через реестр.
-        replication_strategy_name: Имя стратегии репликации
-        weights_strategy_name: Имя стратегии расчёта весов
+
+        completion_strategy_name: Имя стратегии завершения репликации
+        completion_k: Количество ответов для завершения репликации (нужно только для QUORUM и K_OUT_OF_N)
     """
 
     service: str | None
@@ -29,3 +34,6 @@ class BRSRequest:
     balancer_strategy_name: str | None
     weights_strategy_name: str | None
     replication_strategy_name: str | None
+
+    completion_strategy_name: str | None
+    completion_k: int | None

@@ -1,5 +1,6 @@
 from enum import StrEnum
 
+from core.application.ports.strategy_provider import StrategyProvider
 from modules.replication.adapters.outbound.strategies.base import ReplicationStrategy
 from modules.replication.adapters.outbound.strategies.fixed_r_way import (
     FixedParallelReplication,
@@ -18,7 +19,7 @@ class ReplicationAlgorithmName(StrEnum):
     SPECULATIVE = "speculative"
 
 
-class ReplicationStrategyRegistry:
+class ReplicationStrategyRegistry(StrategyProvider[ReplicationStrategy]):
     """Реестр стратегий репликации.
 
     СУЩЕСТВЕННЫЙ совет:

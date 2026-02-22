@@ -3,7 +3,7 @@ from enum import StrEnum
 from modules.decision.adapters.outbound.weights.weights_provider import (
     EntropyWeightsProvider,
 )
-from modules.decision.application.ports.outbound.strategy_provider import (
+from core.application.ports.strategy_provider import (
     StrategyProvider,
 )
 from modules.decision.domain.weights_strategy import WeightsStrategy

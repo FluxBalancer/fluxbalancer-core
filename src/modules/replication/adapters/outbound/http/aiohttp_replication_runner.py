@@ -2,14 +2,13 @@ import asyncio
 import hashlib
 import time
 from asyncio import Task
-from typing import Callable
 
 from aiohttp import ClientSession
 
 from modules.replication.application.ports.outbound.latency_recorder import (
     LatencyRecorder,
 )
-from modules.replication.application.ports.outbound.replication_runnter import (
+from modules.replication.application.ports.outbound.replication_runner import (
     ReplicationRunner,
 )
 from modules.replication.domain.model.execution_result import ExecutionResult
@@ -18,7 +17,6 @@ from modules.replication.domain.model.replication_plan import ReplicationPlan
 from modules.replication.domain.model.replication_target import ReplicationTarget
 from src.modules.replication.domain.completion import (
     CompletionPolicy,
-    FirstValidPolicy,
     ReplicaReply,
 )
 
@@ -41,22 +39,19 @@ class AiohttpReplicationRunner(ReplicationRunner):
         self,
         client: ClientSession,
         latency_recorder: LatencyRecorder,
-        *,
-        completion_factory: Callable[[], CompletionPolicy] | None = None,
     ):
         self.client = client
         self.latency_recorder = latency_recorder
-        # TODO: add completion strategy
-        self.completion_factory = completion_factory or (lambda: FirstValidPolicy())
 
     async def execute(
-        self, cmd: ReplicationCommand, plan: ReplicationPlan
+        self, cmd: ReplicationCommand, plan: ReplicationPlan, policy: CompletionPolicy
     ) -> ExecutionResult:
         """Выполняет план репликации.
 
         Args:
             cmd: Данные команды репликации
-            plan: План репликации.
+            plan: План репликации
+            policy:
 
         Returns:
             Ответ, выбранный политикой завершения.
@@ -64,7 +59,6 @@ class AiohttpReplicationRunner(ReplicationRunner):
         Raises:
             RuntimeError: Если ни одна реплика не дала валидный результат.
         """
-        policy: CompletionPolicy = self.completion_factory()
         tasks: list[Task[ReplicaReply]] = [
             asyncio.create_task(
                 self._call_one(

@@ -13,12 +13,17 @@ class BRSParser:
 
     Поддерживаемые заголовки:
       - X-Service (str, обязателен)
+
       - X-Replications-Count (int | "true", опционален)
       - X-Replications-All (bool, опционален)
       - X-Replications-Strategy (str, опционален)
       - X-Balancer-Deadline (int, миллисекунды, обязателен)
+
       - X-Balancer-Strategy (str, опционален)
       - X-Weights-Strategy (str, опционален)
+
+      - X-Completion-Strategy (str, опционален)
+      - X-Completion-K (int, опционален)
     """
 
     DEFAULT_REPLICATIONS = 3
@@ -40,12 +45,17 @@ class BRSParser:
         headers: Headers = request.headers
 
         service = cls._parse_service(headers)
+
         deadline_ms = cls._parse_deadline(headers)
         replicate_all = cls._parse_replicate_all(headers)
         replications_count = cls._parse_replications_count(headers)
+        replication_strategy = cls._parse_replication_strategy(headers)
+
         balancer_strategy = cls._parse_strategy(headers)
         weights_strategy = cls._parse_weights_strategy(headers)
-        replication_strategy = cls._parse_replication_strategy(headers)
+
+        completion_strategy_name = cls._parse_completion_strategy()
+        completion_k = cls._parse_completion_k()
 
         return BRSRequest(
             service=service,
@@ -55,7 +65,23 @@ class BRSParser:
             balancer_strategy_name=balancer_strategy,
             weights_strategy_name=weights_strategy,
             replication_strategy_name=replication_strategy,
+            completion_strategy_name=completion_strategy_name,
+            completion_k=completion_k,
         )
+
+    @staticmethod
+    def _parse_completion_strategy(headers: Headers) -> str | None:
+        value = headers.get("X-Completion-Strategy")
+        if value is None:
+            return None
+        return value.strip().lower()
+
+    @staticmethod
+    def _parse_completion_k(headers: Headers) -> int | None:
+        value = headers.get("X-Completion-K")
+        if value is None:
+            return None
+        return int(value)
 
     @staticmethod
     def _parse_replication_strategy(headers: Headers) -> str | None:

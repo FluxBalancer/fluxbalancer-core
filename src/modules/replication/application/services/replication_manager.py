@@ -2,7 +2,10 @@ from starlette.requests import Request
 from starlette.responses import Response
 
 from modules.gateway.application.dto.brs import BRSRequest
-from modules.replication.application.ports.outbound.replication_runnter import (
+from modules.replication.adapters.outbound.registries.completion_strategy_registry import (
+    CompletionStrategyRegistry,
+)
+from modules.replication.application.ports.outbound.replication_runner import (
     ReplicationRunner,
 )
 from modules.replication.application.services.replication_planner import (
@@ -27,9 +30,11 @@ class ReplicationManager:
         self,
         planner: ReplicationPlanner,
         executor: ReplicationRunner,
+        completion_registry: CompletionStrategyRegistry,
     ):
         self.planner = planner
         self.runner = executor
+        self.completion_registry = completion_registry
 
     async def execute(
         self,
@@ -54,6 +59,14 @@ class ReplicationManager:
             headers=request.headers,
             body=await request.body(),
         )
-        result: ExecutionResult = await self.runner.execute(cmd, plan)
+
+        policy = self.completion_registry.get(
+            brs.completion_strategy_name,
+            k=brs.completion_k,
+        )
+
+        result: ExecutionResult = await self.runner.execute(
+            cmd=cmd, plan=plan, policy=policy
+        )
 
         return Response(content=result.body, status_code=result.status)

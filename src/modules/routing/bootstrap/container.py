@@ -1,5 +1,8 @@
 from aiohttp import ClientSession
 
+from core.application.ports.strategy_provider import (
+    StrategyProvider,
+)
 from modules.decision.adapters.outbound.registries.balancer_strategy_registry import (
     BalancerStrategyRegistry,
     AlgorithmName,
@@ -11,8 +14,8 @@ from modules.decision.adapters.outbound.registries.weight_strategy_registry impo
 from modules.decision.application.services.default_decision_resolver import (
     DefaultDecisionResolver,
 )
-from modules.decision.application.ports.outbound.strategy_provider import (
-    StrategyProvider,
+from modules.decision.domain.policies.decision_resolver_policy import (
+    DecisionResolverPolicy,
 )
 from modules.decision.domain.ranking_strategy import RankingStrategy
 from modules.decision.domain.weights_strategy import WeightsStrategy
@@ -37,22 +40,25 @@ from modules.replication.adapters.outbound.http.aiohttp_replication_runner impor
 from modules.replication.adapters.outbound.registry.replication_strategy_registry import (
     ReplicationStrategyRegistry,
 )
+
+from modules.replication.adapters.outbound.registries.completion_strategy_registry import (
+    CompletionStrategyRegistry,
+)
+from modules.replication.adapters.outbound.strategies.base import ReplicationStrategy
 from modules.replication.application.ports.outbound.latency_recorder import (
     LatencyRecorder,
+)
+from modules.replication.application.services.replication_manager import (
+    ReplicationManager,
 )
 from modules.replication.application.services.replication_planner import (
     ReplicationPlanner,
     PlannerConfig,
 )
+from modules.replication.domain.completion import CompletionPolicy
 from modules.replication.domain.policies.replication_policy import ReplicationPolicy
-from modules.decision.domain.policies.decision_resolver_policy import (
-    DecisionResolverPolicy,
-)
 from src.modules.observability.application.ports.metrics_repository import (
     MetricsRepository,
-)
-from modules.replication.application.services.replication_manager import (
-    ReplicationManager,
 )
 from src.modules.routing.application.ports.choose_node_port import (
     ChooseNodePort,
@@ -75,6 +81,7 @@ class RoutingModule:
         self.registry: NodeRegistry
         self.balancer_registry: StrategyProvider[RankingStrategy]
         self.weights_registry: StrategyProvider[WeightsStrategy]
+        self.completion_registry: StrategyProvider[CompletionPolicy]
 
         self.decision_policy: DecisionResolverPolicy
         self.choose_node_uc: ChooseNodePort
@@ -83,7 +90,7 @@ class RoutingModule:
         self.replication_planner: ReplicationPlanner
         self.replication_executor: AiohttpReplicationRunner = None
         self.replication_manager: ReplicationManager = None
-        self.replication_strategy_registry: ReplicationStrategyRegistry
+        self.replication_strategy_registry: StrategyProvider[ReplicationStrategy]
 
         self.proxy_use_case: ProxyRequestUseCase = None
 
@@ -151,6 +158,7 @@ class RoutingModule:
     def _init_registries(self) -> None:
         self.balancer_registry = BalancerStrategyRegistry()
         self.weights_registry = WeightsProviderRegistry()
+        self.completion_registry = CompletionStrategyRegistry()
 
     def _init_decision_policy(self) -> None:
         self.decision_policy = DefaultDecisionResolver(

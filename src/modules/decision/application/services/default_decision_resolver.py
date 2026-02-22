@@ -1,4 +1,4 @@
-from modules.decision.application.ports.outbound.strategy_provider import (
+from core.application.ports.strategy_provider import (
     StrategyProvider,
 )
 from modules.decision.domain.weights_strategy import WeightsStrategy

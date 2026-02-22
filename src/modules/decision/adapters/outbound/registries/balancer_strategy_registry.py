@@ -9,7 +9,7 @@ from modules.decision.adapters.outbound.strategies.lc_strategy import (
 )
 from modules.decision.adapters.outbound.strategies.saw_strategy import SAWStrategy
 from modules.decision.adapters.outbound.strategies.topsis_strategy import TopsisStrategy
-from modules.decision.application.ports.outbound.strategy_provider import (
+from core.application.ports.strategy_provider import (
     StrategyProvider,
 )
 from src.modules.decision.domain.ranking_strategy import RankingStrategy
@@ -33,7 +33,7 @@ class BalancerStrategyRegistry(StrategyProvider[RankingStrategy]):
             AlgorithmName.LinearScalarization: LinearScalarizationStrategy(),
         }
 
-    def get(self, name: str) -> RankingStrategy:
+    def get(self, name: str, **kwargs) -> RankingStrategy:
         try:
             key = AlgorithmName(name.strip().lower())
             return self._algos[key]
