@@ -1,80 +1,45 @@
-from __future__ import annotations
-
-from src.modules.routing.adapters.outbound.metrics.docker.docker_collector import (
-    DockerMetricsCollector,
-)
-from src.modules.routing.adapters.outbound.metrics.docker.extractors.cpu import (
-    CpuExtractorPolicy,
-)
-from src.modules.routing.adapters.outbound.metrics.docker.extractors.memory import (
-    MemoryExtractorPolicy,
-)
-from src.modules.routing.adapters.outbound.metrics.docker.extractors.network import (
-    NetworkExtractorPolicy,
-)
-from src.modules.routing.adapters.outbound.metrics.storage.memory_aggregation_repository import (
-    InMemoryMetricsAggregationRepository,
-)
-from src.modules.routing.adapters.outbound.metrics.storage.memory_repository import (
-    InMemoryMetricsRepository,
-)
-from src.modules.routing.adapters.outbound.metrics.storage.redis_repository import (
-    RedisMetricsRepository,
-)
-from src.modules.routing.adapters.outbound.registry.docker_node_registry import (
-    DockerNodeRegistry,
-)
-from src.modules.routing.adapters.outbound.strategy.balancer_strategy_registry import (
-    BalancerStrategyRegistry,
-    AlgorithmName,
-)
-from src.modules.routing.adapters.outbound.strategy.replication_strategy_registry import (
-    ReplicationStrategyRegistry,
-)
-from src.modules.routing.adapters.outbound.strategy.weight_strategy_registry import (
-    WeightsProviderRegistry,
-    WeightsAlgorithmName,
-)
-from src.modules.routing.application.policies.default_decision_policy_resolver import (
-    DefaultDecisionPolicyResolver,
-)
-from src.modules.routing.application.ports.inbound.node.choose_node_port import (
-    ChooseNodePort,
-)
-from src.modules.routing.application.ports.outbound.metrics.collector import (
-    CollectorManager,
-)
-from src.modules.routing.application.ports.outbound.metrics.metrics_repository import (
-    MetricsRepository,
-)
-from src.modules.routing.application.ports.outbound.node.node_registry import (
-    NodeRegistry,
-)
-from src.modules.routing.application.ports.outbound.strategy.balancer_strategy_provider import (
-    BalancerStrategyProvider,
-)
-from src.modules.routing.application.ports.outbound.strategy.weight_strategy_provider import (
-    WeightStrategyProvider,
-)
-from src.modules.routing.application.ports.policies.decision_policy_resolver import (
+from src.modules.decision.application.decision_policy_resolver import (
     DecisionPolicyResolver,
 )
-from src.modules.routing.application.usecase.metrics.metrics_updater import (
-    MetricsUpdater,
+from src.modules.decision.application.ports.balancer_strategy_provider import (
+    BalancerStrategyProvider,
 )
-from src.modules.routing.application.usecase.node.choose_node import ChooseNodeUseCase
-from src.modules.routing.application.usecase.replication.replication_executor import (
+from src.modules.decision.application.ports.weight_strategy_provider import (
+    WeightStrategyProvider,
+)
+from src.modules.observability.adapters.docker.docker_collector import (
+    DockerMetricsCollector,
+)
+from src.modules.observability.adapters.docker.extractors.network import (
+    NetworkExtractorPolicy,
+)
+from src.modules.observability.adapters.storage.memory_aggregation_repository import (
+    InMemoryMetricsAggregationRepository,
+)
+from src.modules.observability.application.ports.collector import CollectorManager
+from src.modules.observability.application.ports.metrics_repository import (
+    MetricsRepository,
+)
+from src.modules.observability.application.usecase.metrics_updater import MetricsUpdater
+from src.modules.replication.adapters.registries.replication_strategy_registry import (
+    ReplicationStrategyRegistry,
+)
+from src.modules.replication.application.replication_executor import (
     ReplicationExecutor,
 )
-from src.modules.routing.application.usecase.replication.replication_manager import (
+from src.modules.replication.application.replication_manager import (
     ReplicationManager,
 )
-from src.modules.routing.application.usecase.replication.replication_planner import (
+from src.modules.replication.application.replication_planner import (
     ReplicationPlanner,
     PlannerConfig,
 )
+from src.modules.replication.domain.replication_policy import ReplicationPolicy
+from src.modules.routing.application.ports.choose_node_port import (
+    ChooseNodePort,
+)
+from src.modules.routing.application.usecase.choose_node import ChooseNodeUseCase
 from src.modules.routing.config.settings import settings, MetricsBackend
-from src.modules.routing.domain.policies.replication_policy import ReplicationPolicy
 
 
 class RoutingModule:
@@ -135,7 +100,7 @@ class RoutingModule:
         )
 
     def _init_registry(self) -> None:
-        self.registry = DockerNodeRegistry()
+        self.registry = InMemoryNodeRegistry()
 
     def _init_strategies(self) -> None:
         self.balancer_registry = BalancerStrategyRegistry()

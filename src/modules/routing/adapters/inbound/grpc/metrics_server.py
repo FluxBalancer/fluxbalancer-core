@@ -5,13 +5,13 @@ import grpc.aio
 import contracts.metrics.metrics_pb2 as metrics_pb2
 import contracts.metrics.metrics_pb2_grpc as metrics_pb2_grpc
 
-from src.modules.routing.application.ports.outbound.metrics.metrics_repository import (
+from src.modules.observability.application.ports.metrics_repository import (
     MetricsRepository,
 )
-from src.modules.routing.application.ports.outbound.node.node_registry import (
+from src.modules.discovery.application.ports.node_registry import (
     NodeRegistry,
 )
-from src.modules.routing.domain.entities.node.node_metrics import NodeMetrics
+from src.modules.observability.domain.node_metrics import NodeMetrics
 
 logger = logging.getLogger("metrics.service")
 

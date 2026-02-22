@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.modules.mcdm.algorithms.topsis import topsis
+from src.modules.decision.adapters.algorithms.topsis import topsis
 
 
 def test_topsis_simple():

@@ -1,6 +1,6 @@
 import numpy as np
 
-from src.modules.mcdm.algorithms.airm import airm
+from src.modules.decision.adapters.algorithms.airm import airm
 
 
 def test_airm_deterministic():
