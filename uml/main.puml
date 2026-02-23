@@ -1,0 +1,12 @@
+@startuml
+title FluxBalancer Core — UML Overview
+
+!include modules/components.puml
+newpage
+!include modules/mcdm.puml
+newpage
+!include modules/replication.puml
+newpage
+!include modules/observability.puml
+
+@enduml

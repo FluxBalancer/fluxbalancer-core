@@ -1,0 +1,94 @@
+@startuml
+title FluxBalancer Core — Architecture
+
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+package "Inbound" {
+  class ProxyMiddleware
+  class ChooseNodeRouter
+  class MetricsService
+  class BRSParser
+}
+
+package "Application" {
+  class ProxyRequestUseCase
+  class ChooseNodeUseCase
+  class ReplicationManager
+  class ReplicationPlanner
+  class MetricsSnapshotBuilder
+  class DefaultDecisionResolver
+}
+
+package "Ports" {
+  interface ChooseNodePort
+  interface MetricsRepository
+  interface MetricsAggregationRepository
+  interface NodeRegistry
+  interface ReplicationRunner
+  interface LatencyRecorder
+  interface DecisionResolverPolicy
+}
+
+package "Adapters" {
+  class InMemoryNodeRegistry
+  class InMemoryMetricsRepository
+  class RedisMetricsRepository
+  class InMemoryMetricsAggregationRepository
+  class AiohttpReplicationRunner
+  class MetricsRepositoryLatencyRecorder
+}
+
+package "Registries" {
+  class BalancerStrategyRegistry
+  class WeightsStrategyRegistry
+  class ReplicationStrategyRegistry
+  class CompletionStrategyRegistry
+}
+
+' ========= Inbound -> Application =========
+ProxyMiddleware --> ProxyRequestUseCase
+BRSParser --> ProxyRequestUseCase
+ChooseNodeRouter --> MetricsAggregationRepository
+MetricsService --> MetricsRepository
+MetricsService --> NodeRegistry
+
+' ========= Use case dependencies =========
+ProxyRequestUseCase --> ChooseNodePort
+ProxyRequestUseCase --> ReplicationManager
+ProxyRequestUseCase --> MetricsRepository
+
+ChooseNodeUseCase ..|> ChooseNodePort
+ChooseNodeUseCase --> MetricsRepository
+ChooseNodeUseCase --> NodeRegistry
+ChooseNodeUseCase --> DecisionResolverPolicy
+
+ReplicationManager --> ReplicationPlanner
+ReplicationManager --> ReplicationRunner
+ReplicationManager --> LatencyRecorder
+
+ReplicationPlanner --> MetricsRepository
+ReplicationPlanner --> ReplicationStrategyRegistry
+
+MetricsSnapshotBuilder --> MetricsRepository
+
+' ========= Policy / Resolver =========
+DefaultDecisionResolver ..|> DecisionResolverPolicy
+ChooseNodeUseCase --> DefaultDecisionResolver
+
+' ========= Registries usage =========
+DefaultDecisionResolver --> BalancerStrategyRegistry
+DefaultDecisionResolver --> WeightsStrategyRegistry
+ReplicationManager --> CompletionStrategyRegistry
+ReplicationPlanner --> ReplicationStrategyRegistry
+
+' ========= Adapters implement Ports =========
+InMemoryNodeRegistry ..|> NodeRegistry
+InMemoryMetricsRepository ..|> MetricsRepository
+RedisMetricsRepository ..|> MetricsRepository
+InMemoryMetricsAggregationRepository ..|> MetricsAggregationRepository
+AiohttpReplicationRunner ..|> ReplicationRunner
+MetricsRepositoryLatencyRecorder ..|> LatencyRecorder
+MetricsRepositoryLatencyRecorder --> MetricsRepository
+
+@enduml

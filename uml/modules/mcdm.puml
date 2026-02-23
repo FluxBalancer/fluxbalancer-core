@@ -1,0 +1,48 @@
+@startuml
+title Node Ranking (MCDM) — from metrics to ranked endpoints
+
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+package "Routing" {
+  class "ChooseNodeUseCase" {
+   +execute(brs)
+   +rank_nodes(brs)
+  }
+}
+
+package "Inputs" {
+  class BRSRequest
+  class NodeMetrics
+}
+
+package "Ports" {
+  interface MetricsRepository
+  interface NodeRegistry
+  interface DecisionResolverPolicy
+  interface RankingStrategy
+  interface WeightsStrategy
+}
+
+package "Math" {
+  class Normalization {
+    +normalize_cost(X)
+  }
+}
+
+' Data flow
+ChooseNodeUseCase --> MetricsRepository : list_latest(), get_prev()
+MetricsRepository --> NodeMetrics
+ChooseNodeUseCase --> NodeRegistry : get_endpoint()
+
+ChooseNodeUseCase --> DecisionResolverPolicy : resolve
+DecisionResolverPolicy --> RankingStrategy
+DecisionResolverPolicy --> WeightsStrategy
+
+ChooseNodeUseCase --> NodeMetrics : to_vector()
+ChooseNodeUseCase --> Normalization : normalize_cost()
+ChooseNodeUseCase --> WeightsStrategy : compute(weights)
+ChooseNodeUseCase --> RankingStrategy : score_all()
+ChooseNodeUseCase --> BRSRequest
+
+@enduml

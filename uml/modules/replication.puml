@@ -1,0 +1,63 @@
+@startuml
+title Replication — planning, execution, completion
+
+skinparam shadowing false
+skinparam packageStyle rectangle
+
+package "Replication Application" {
+  class ReplicationManager {
+    +execute(request, brs)
+  }
+  class ReplicationPlanner {
+    +build(brs)
+  }
+  interface ReplicationRunner {
+    +execute(cmd, plan, policy, deadline)
+  }
+}
+
+package "Replication Domain" {
+  class ReplicationPlan
+  class ReplicationTarget
+  class ReplicationCommand
+  class ExecutionResult
+  interface ReplicationStrategy {
+    +build(ranked, max_replicas)
+  }
+  interface CompletionPolicy {
+    +push(reply)
+    +is_done()
+    +choose()
+  }
+  class ReplicaReply
+}
+
+package "Ports / External" {
+  interface MetricsRepository
+  interface LatencyRecorder
+  class ChooseNodeUseCase
+}
+
+' Manager orchestration
+ReplicationManager --> ReplicationPlanner : build plan
+ReplicationManager --> ReplicationRunner : execute replicas
+ReplicationManager --> CompletionPolicy : completion rule
+ReplicationManager --> LatencyRecorder : record winner
+
+' Planner dependencies
+ReplicationPlanner --> ChooseNodeUseCase : rank_nodes
+ReplicationPlanner --> MetricsRepository : read latency_hat
+ReplicationPlanner --> ReplicationStrategy : strategy
+
+' Runner & policy collaboration
+ReplicationRunner --> CompletionPolicy : push / choose
+ReplicationRunner --> ReplicaReply
+ReplicationRunner --> ExecutionResult
+
+' Plan structure
+ReplicationPlan "1" o-- "1..*" ReplicationTarget
+
+' Command/result relation (слабая зависимость)
+ExecutionResult ..> ReplicationCommand
+
+@enduml

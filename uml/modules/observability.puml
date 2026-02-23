@@ -1,0 +1,59 @@
+@startuml
+title Observability — metrics storage & aggregation
+
+skinparam packageStyle rectangle
+skinparam shadowing false
+
+package "Domain" {
+  class NodeMetrics <<entity>> {
+    timestamp: str
+    node_id: str
+    cpu_util: float
+    mem_util: float
+    net_in_bytes: int
+    net_out_bytes: int
+    latency_ms: float?
+    +to_vector(interval, prev, nic_gbps): List<float>
+  }
+  class EMA <<service>> {
+    +ema(prev, cur, alpha): float
+  }
+}
+
+package "Ports" {
+  interface MetricsRepository <<port>> {
+    +upsert(metrics)
+    +get_latest(node_id)
+    +get_prev(node_id)
+    +list_latest()
+    +add_latency(node_id, ms)
+  }
+
+  interface MetricsAggregationRepository <<port>> {
+    +update_cpu(node_id, value)
+    +update_mem(node_id, value)
+    +get_averages(): Map
+  }
+}
+
+package "Adapters (Storage)" {
+  class InMemoryMetricsRepository <<adapter>>
+  class RedisMetricsRepository <<adapter>>
+  InMemoryMetricsRepository ..|> MetricsRepository
+  RedisMetricsRepository ..|> MetricsRepository
+
+  class InMemoryMetricsAggregationRepository <<adapter>>
+  InMemoryMetricsAggregationRepository ..|> MetricsAggregationRepository
+}
+
+package "Services" {
+  class MetricsSnapshotBuilder <<service>> {
+    +build(): List<dict>
+  }
+}
+
+MetricsSnapshotBuilder --> MetricsRepository : list_latest()
+MetricsRepository --> NodeMetrics
+InMemoryMetricsAggregationRepository --> EMA : ema()
+
+@enduml
