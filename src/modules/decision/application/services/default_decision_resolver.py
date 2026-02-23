@@ -1,11 +1,11 @@
 from core.application.ports.strategy_provider import (
     StrategyProvider,
 )
-from modules.decision.domain.weights_strategy import WeightsStrategy
-from modules.gateway.application.dto.brs import BRSRequest
 from modules.decision.domain.policies.decision_resolver_policy import (
     DecisionResolverPolicy,
 )
+from modules.decision.domain.weights_strategy import WeightsStrategy
+from modules.gateway.application.dto.brs import BRSRequest
 from src.modules.decision.domain.ranking_strategy import RankingStrategy
 
 
@@ -36,6 +36,7 @@ class DefaultDecisionResolver(DecisionResolverPolicy):
         try:
             return self.balancer_provider.get(brs.balancer_strategy_name)
         except ValueError as e:
+            # TODO: add handler
             raise ValueError(
                 f"BRS: неизвестная стратегия балансировки: {brs.balancer_strategy_name}"
             ) from e

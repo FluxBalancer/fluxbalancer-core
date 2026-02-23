@@ -1,10 +1,10 @@
 from enum import StrEnum
 
-from modules.decision.adapters.outbound.weights.entropy_weights_strategy import (
-    EntropyWeightsStrategy,
-)
 from core.application.ports.strategy_provider import (
     StrategyProvider,
+)
+from modules.decision.adapters.outbound.weights.entropy_weights_strategy import (
+    EntropyWeightsStrategy,
 )
 from modules.decision.domain.weights_strategy import WeightsStrategy
 

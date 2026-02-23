@@ -28,4 +28,5 @@ class InMemoryMetricsAggregationRepository(MetricsAggregationRepository):
         return {
             "cpu_avg_percentage": dict(self._cpu_avg),
             "mem_avg_percentage": dict(self._mem_avg),
+            "lat_avg": dict(self._lat_avg),
         }

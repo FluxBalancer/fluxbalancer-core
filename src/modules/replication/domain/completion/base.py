@@ -37,3 +37,9 @@ class CompletionPolicy(Protocol):
     def choose(self) -> ReplicaReply:
         """Возвращает выбранный итоговый ответ."""
         ...
+
+
+@dataclass(slots=True)
+class CompletionPolicyInput:
+    strategy_name: str
+    k: int | None = None

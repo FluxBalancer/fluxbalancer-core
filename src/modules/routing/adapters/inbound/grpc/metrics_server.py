@@ -1,15 +1,15 @@
 import logging
 from dataclasses import asdict
 
-import grpc.aio
 import contracts.metrics.metrics_pb2 as metrics_pb2
 import contracts.metrics.metrics_pb2_grpc as metrics_pb2_grpc
+import grpc.aio
 
-from src.modules.observability.application.ports.metrics_repository import (
-    MetricsRepository,
-)
 from modules.discovery.application.ports.outbound.node_registry import (
     NodeRegistry,
+)
+from src.modules.observability.application.ports.metrics_repository import (
+    MetricsRepository,
 )
 from src.modules.observability.domain.node_metrics import NodeMetrics
 

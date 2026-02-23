@@ -1,10 +1,10 @@
 from dataclasses import dataclass
 
+from modules.replication.adapters.outbound.strategies.base import ReplicationStrategy
+from modules.replication.domain.model.replication_plan import ReplicationPlan
 from modules.replication.domain.services.speculative_execution import (
     speculative_execution,
 )
-from modules.replication.domain.model.replication_plan import ReplicationPlan
-from modules.replication.adapters.outbound.strategies.base import ReplicationStrategy
 
 
 @dataclass(slots=True)

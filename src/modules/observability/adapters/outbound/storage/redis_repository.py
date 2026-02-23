@@ -64,6 +64,9 @@ class RedisMetricsRepository(MetricsRepository):
         self.latency_window = latency_window
         self.prefix = prefix
 
+    def _k_nodes(self) -> str:
+        return f"{self.prefix}:nodes"
+
     def _k_latest(self, node_id: str) -> str:
         """
         Формирует ключ Redis для хранения
@@ -166,6 +169,7 @@ class RedisMetricsRepository(MetricsRepository):
                 )
                 .lpush(self._k_history(metrics.node_id), self._serialize(metrics))
                 .ltrim(self._k_history(metrics.node_id), 0, self.history_limit - 1)
+                .sadd(self._k_nodes(), metrics.node_id)
                 .execute()
             )
 
@@ -277,12 +281,43 @@ class RedisMetricsRepository(MetricsRepository):
         Returns:
             Список последних метрик по всем узлам.
         """
+        node_ids = await self.redis.smembers(self._k_nodes())
+        if not node_ids:
+            return []
+
+        async with self.redis.pipeline(transaction=False) as pipe:
+            for node_id in node_ids:
+                await pipe.hgetall(self._k_latest(node_id))
+            latest_data = await pipe.execute()
+
+        async with self.redis.pipeline(transaction=False) as pipe:
+            for node_id in node_ids:
+                await pipe.lrange(self._k_latency(node_id), 0, -1)
+            latency_data = await pipe.execute()
+
         result: list[NodeMetrics] = []
 
-        async for key in self.redis.scan_iter(f"{self.prefix}:*:latest"):
-            node_id = key.split(":")[1]
-            metrics = await self.get_latest(node_id)
-            if metrics:
-                result.append(metrics)
+        for node_id, raw_metrics, raw_latency in zip(
+            node_ids, latest_data, latency_data
+        ):
+            if not raw_metrics:
+                continue
+
+            latency_ms = None
+            if raw_latency:
+                arr = np.asarray([float(v) for v in raw_latency])
+                latency_ms = float(np.percentile(arr, 95))
+
+            result.append(
+                NodeMetrics(
+                    timestamp=raw_metrics["timestamp"],
+                    node_id=raw_metrics["node_id"],
+                    cpu_util=float(raw_metrics["cpu_util"]),
+                    mem_util=float(raw_metrics["mem_util"]),
+                    net_in_bytes=int(raw_metrics["net_in_bytes"]),
+                    net_out_bytes=int(raw_metrics["net_out_bytes"]),
+                    latency_ms=latency_ms,
+                )
+            )
 
         return result

@@ -3,13 +3,13 @@ import logging
 import numpy as np
 
 from modules.decision.domain.normalization import normalize_cost
+from modules.decision.domain.policies.decision_resolver_policy import (
+    DecisionResolverPolicy,
+)
 from modules.discovery.application.ports.outbound.node_registry import (
     NodeRegistry,
 )
 from modules.gateway.application.dto.brs import BRSRequest
-from modules.decision.domain.policies.decision_resolver_policy import (
-    DecisionResolverPolicy,
-)
 from src.modules.decision.domain.ranking_strategy import RankingStrategy
 from src.modules.decision.domain.weights_strategy import (
     WeightsStrategy,

@@ -1,5 +1,5 @@
 from enum import StrEnum
-from typing import Callable, Any
+from typing import Callable
 
 from core.application.ports.strategy_provider import StrategyProvider
 from modules.replication.domain.completion import (

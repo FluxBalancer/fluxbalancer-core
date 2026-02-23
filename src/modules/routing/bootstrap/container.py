@@ -105,13 +105,12 @@ class RoutingModule:
         self.replication_executor = AiohttpReplicationRunner(
             client=client_session,
             latency_recorder=self.latency_recorder,
+            completion_policy_strategy=self.completion_registry,
         )
 
         self.replication_manager = ReplicationManager(
             planner=self.replication_planner,
             executor=self.replication_executor,
-            completion_registry=self.completion_registry,
-            latency_recorder=self.latency_recorder,
         )
 
         self.proxy_use_case = ProxyRequestUseCase(

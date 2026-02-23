@@ -54,8 +54,8 @@ class BRSParser:
         balancer_strategy = cls._parse_strategy(headers)
         weights_strategy = cls._parse_weights_strategy(headers)
 
-        completion_strategy_name = cls._parse_completion_strategy()
-        completion_k = cls._parse_completion_k()
+        completion_strategy_name = cls._parse_completion_strategy(headers)
+        completion_k = cls._parse_completion_k(headers)
 
         return BRSRequest(
             service=service,

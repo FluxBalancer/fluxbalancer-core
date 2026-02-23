@@ -5,12 +5,14 @@ from asyncio import Task
 
 from aiohttp import ClientSession, ClientTimeout
 
+from core.application.ports.strategy_provider import StrategyProvider
 from modules.replication.application.ports.outbound.latency_recorder import (
     LatencyRecorder,
 )
 from modules.replication.application.ports.outbound.replication_runner import (
     ReplicationRunner,
 )
+from modules.replication.domain.completion.base import CompletionPolicyInput
 from modules.replication.domain.model.execution_result import ExecutionResult
 from modules.replication.domain.model.replication_command import ReplicationCommand
 from modules.replication.domain.model.replication_plan import ReplicationPlan
@@ -39,15 +41,17 @@ class AiohttpReplicationRunner(ReplicationRunner):
         self,
         client: ClientSession,
         latency_recorder: LatencyRecorder,
+        completion_policy_strategy: StrategyProvider[CompletionPolicy],
     ):
         self.client = client
         self.latency_recorder = latency_recorder
+        self.completion_policy_strategy = completion_policy_strategy
 
     async def execute(
         self,
         cmd: ReplicationCommand,
         plan: ReplicationPlan,
-        policy: CompletionPolicy,
+        policy_input: CompletionPolicyInput,
         deadline_at: float,
     ) -> ExecutionResult:
         """Выполняет план репликации.
@@ -55,7 +59,7 @@ class AiohttpReplicationRunner(ReplicationRunner):
         Args:
             cmd: Данные команды репликации
             plan: План репликации
-            policy:
+            policy_input:
             deadline_at:
 
         Returns:
@@ -64,6 +68,10 @@ class AiohttpReplicationRunner(ReplicationRunner):
         Raises:
             RuntimeError: Если ни одна реплика не дала валидный результат.
         """
+        completion_strategy: CompletionPolicy = self.completion_policy_strategy.get(
+            name=policy_input.strategy_name, k=policy_input.k
+        )
+
         tasks: list[Task[ReplicaReply]] = [
             asyncio.create_task(
                 self._call_one(target=t, cmd=cmd, deadline_at=deadline_at)
@@ -89,10 +97,10 @@ class AiohttpReplicationRunner(ReplicationRunner):
 
                 for task in done:
                     reply: ReplicaReply = await task
-                    policy.push(reply)
+                    completion_strategy.push(reply)
 
-                    if policy.is_done():
-                        winner = policy.choose()
+                    if completion_strategy.is_done():
+                        winner = completion_strategy.choose()
 
                         for p in pending:
                             p.cancel()

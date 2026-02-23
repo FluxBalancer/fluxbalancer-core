@@ -1,5 +1,4 @@
 import numpy as np
-from numpy.typing import NDArray
 
 from src.modules.types.numpy import Matrix, Vector
 

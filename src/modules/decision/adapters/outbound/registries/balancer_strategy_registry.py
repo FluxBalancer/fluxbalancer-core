@@ -1,5 +1,8 @@
 from enum import StrEnum
 
+from core.application.ports.strategy_provider import (
+    StrategyProvider,
+)
 from modules.decision.adapters.outbound.strategies.airm_strategy import AIRMStrategy
 from modules.decision.adapters.outbound.strategies.electre_strategy import (
     ELECTREStrategy,
@@ -9,9 +12,6 @@ from modules.decision.adapters.outbound.strategies.lc_strategy import (
 )
 from modules.decision.adapters.outbound.strategies.saw_strategy import SAWStrategy
 from modules.decision.adapters.outbound.strategies.topsis_strategy import TopsisStrategy
-from core.application.ports.strategy_provider import (
-    StrategyProvider,
-)
 from src.modules.decision.domain.ranking_strategy import RankingStrategy
 
 
@@ -25,6 +25,7 @@ class AlgorithmName(StrEnum):
 
 class BalancerStrategyRegistry(StrategyProvider[RankingStrategy]):
     def __init__(self):
+        # TODO: make not stateful
         self._algos: dict[AlgorithmName, RankingStrategy] = {
             AlgorithmName.TOPSIS: TopsisStrategy(),
             AlgorithmName.SAW: SAWStrategy(),

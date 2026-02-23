@@ -1,9 +1,9 @@
 from dataclasses import dataclass
 
+from modules.replication.domain.policies.wa_estimator import WAEstimator
 from modules.replication.domain.services.adaptive_selecctor import (
     adaptive_selector_replicas,
 )
-from modules.replication.domain.policies.wa_estimator import WAEstimator
 
 
 @dataclass(slots=True)

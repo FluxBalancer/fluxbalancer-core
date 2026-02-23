@@ -1,8 +1,8 @@
 from dataclasses import dataclass
 
-from modules.replication.domain.services.fixed_r_way import fixed_r_way
-from modules.replication.domain.model.replication_plan import ReplicationPlan
 from modules.replication.adapters.outbound.strategies.base import ReplicationStrategy
+from modules.replication.domain.model.replication_plan import ReplicationPlan
+from modules.replication.domain.services.fixed_r_way import fixed_r_way
 
 
 @dataclass(slots=True)
