@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 import aiohttp
 from fastapi import FastAPI
 
-from src.modules.routing.adapters.inbound.grpc.metrics_server import (
+from modules.observability.adapters.inbound.grpc.metrics_server import (
     start_grpc_metrics_server,
 )
 from src.modules.routing.bootstrap.container import RoutingModule

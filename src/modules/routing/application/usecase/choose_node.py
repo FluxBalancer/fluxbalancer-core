@@ -21,12 +21,13 @@ from src.modules.observability.domain.node_metrics import NodeMetrics
 from src.modules.routing.application.ports.choose_node_port import (
     ChooseNodePort,
 )
-from src.modules.routing.config.settings import settings
+from config.settings import settings
 from src.modules.types.numpy import Vector, Matrix
 
 logger = logging.getLogger("decision")
 
 
+# TODO: add SLAResolver и DeadlineGuard
 class ChooseNodeUseCase(ChooseNodePort):
     def __init__(
         self,

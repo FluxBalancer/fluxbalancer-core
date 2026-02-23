@@ -63,7 +63,7 @@ from src.modules.routing.application.ports.choose_node_port import (
     ChooseNodePort,
 )
 from src.modules.routing.application.usecase.choose_node import ChooseNodeUseCase
-from src.modules.routing.config.settings import settings, MetricsBackend
+from config.settings import settings, MetricsBackend
 
 
 class RoutingModule:
@@ -124,6 +124,7 @@ class RoutingModule:
         self.metrics_agg = InMemoryMetricsAggregationRepository()
 
         if settings.metrics.backend is MetricsBackend.REDIS:
+            print("use redis for metrics repository")
             self.metrics_repo = self._create_redis_metrics_repo()
         else:
             self.metrics_repo = InMemoryMetricsRepository()
