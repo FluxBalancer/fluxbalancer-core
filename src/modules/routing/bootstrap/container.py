@@ -37,12 +37,11 @@ from modules.observability.adapters.outbound.storage.redis_repository import (
 from modules.replication.adapters.outbound.http.aiohttp_replication_runner import (
     AiohttpReplicationRunner,
 )
-from modules.replication.adapters.outbound.registry.replication_strategy_registry import (
-    ReplicationStrategyRegistry,
-)
-
 from modules.replication.adapters.outbound.registries.completion_strategy_registry import (
     CompletionStrategyRegistry,
+)
+from modules.replication.adapters.outbound.registries.replication_strategy_registry import (
+    ReplicationStrategyRegistry,
 )
 from modules.replication.adapters.outbound.strategies.base import ReplicationStrategy
 from modules.replication.application.ports.outbound.latency_recorder import (
