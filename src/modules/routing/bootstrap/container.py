@@ -110,6 +110,8 @@ class RoutingModule:
         self.replication_manager = ReplicationManager(
             planner=self.replication_planner,
             executor=self.replication_executor,
+            completion_registry=self.completion_registry,
+            latency_recorder=self.latency_recorder,
         )
 
         self.proxy_use_case = ProxyRequestUseCase(
@@ -185,6 +187,7 @@ class RoutingModule:
             chooser=self.choose_node_uc,
             policy=self.replication_policy,
             strategy_registry=self.replication_strategy_registry,
+            metrics_repository=self.metrics_repo,
             config=PlannerConfig(adaptive=True, lambda_cost=1.0),
         )
 

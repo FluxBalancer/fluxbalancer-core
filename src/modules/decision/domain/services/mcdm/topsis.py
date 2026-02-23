@@ -11,7 +11,7 @@ def topsis(x_matrix: Matrix, w: Vector) -> Vector:
     (меньшее значение — лучшее)
 
     Args:
-        x_matrix: Матрица решений размера (m, n),
+        x_matrix: Нормализованная матрица решений размера (m, n),
             где m — число альтернатив, n — число критериев
         w: Вектор весов критериев размера (n,)
 
@@ -23,7 +23,6 @@ def topsis(x_matrix: Matrix, w: Vector) -> Vector:
     # Каждый столбец нормируется по евклидовой норме
     norm: Vector = np.linalg.norm(x_matrix, axis=0)
     norm[norm == 0] = 1.0  # защита от деления на 0 для константных критериев
-
     R: Matrix = x_matrix / norm
 
     # Взвешивание нормализованной матрицы

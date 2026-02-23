@@ -2,12 +2,14 @@ import time
 from dataclasses import dataclass
 
 from aiohttp import ClientSession
-from modules.replication.application.replication_manager import ReplicationManager
 
 from modules.gateway.adapters.inbound.http.brs_parser import BRSParser
 from modules.gateway.application.dto.brs import BRSRequest
 from modules.observability.application.ports.metrics_repository import (
     MetricsRepository,
+)
+from modules.replication.application.services.replication_manager import (
+    ReplicationManager,
 )
 from modules.routing.application.ports.choose_node_port import ChooseNodePort
 

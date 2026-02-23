@@ -2,6 +2,7 @@ import logging
 
 import numpy as np
 
+from modules.decision.domain.normalization import normalize_cost
 from modules.discovery.application.ports.outbound.node_registry import (
     NodeRegistry,
 )
@@ -24,8 +25,6 @@ from src.modules.routing.config.settings import settings
 from src.modules.types.numpy import Vector, Matrix
 
 logger = logging.getLogger("decision")
-
-SLA_MAX_LATENCY_MS = 500
 
 
 class ChooseNodeUseCase(ChooseNodePort):
@@ -56,7 +55,7 @@ class ChooseNodeUseCase(ChooseNodePort):
             Список кортежей (node_id, host, port) по убыванию предпочтительности.
         """
         balancer_strategy: RankingStrategy = self.decision_policy.resolve_balancer(brs)
-        weights_provider: WeightsStrategy = self.decision_policy.resolve_weights(brs)
+        weights_strategy: WeightsStrategy = self.decision_policy.resolve_weights(brs)
 
         metrics: list[NodeMetrics] = await self.metrics_repo.list_latest()
         if not metrics:
@@ -65,15 +64,15 @@ class ChooseNodeUseCase(ChooseNodePort):
         vectors: list[list[float]] = [
             m.to_vector(
                 interval=settings.collector_interval,
-                sla_latency_ms=SLA_MAX_LATENCY_MS,
                 prev=await self.metrics_repo.get_prev(m.node_id),
             )
             for m in metrics
         ]
-        X: Matrix = np.vstack(vectors).astype(float)
-        weights: Vector = weights_provider.compute(X)
+        X_raw: Matrix = np.vstack(vectors).astype(float)
+        X_norm: Matrix = normalize_cost(X_raw)
+        weights: Vector = weights_strategy.compute(X_norm)
 
-        scores = balancer_strategy.score_all(X, weights)
+        scores = balancer_strategy.score_all(X_norm, weights)
         order = np.argsort(-scores)
 
         ranked: list[tuple[str, str, int]] = []

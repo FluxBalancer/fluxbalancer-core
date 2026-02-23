@@ -12,7 +12,5 @@ def saw(x_matrix: Matrix, w: Vector) -> Vector:
     Returns:
         Индекс строки-победителя.
     """
-    # Все критерии – «издержки»: меньше → лучше.
-    R: Matrix = x_matrix.min(axis=0) / (x_matrix + 1e-12)
-    scores: Vector = (R * w).sum(axis=1)
+    scores: Vector = (x_matrix * w).sum(axis=1)
     return scores

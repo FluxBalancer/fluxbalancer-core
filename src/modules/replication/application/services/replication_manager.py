@@ -1,9 +1,15 @@
+import asyncio
+import time
+
 from starlette.requests import Request
 from starlette.responses import Response
 
 from modules.gateway.application.dto.brs import BRSRequest
 from modules.replication.adapters.outbound.registries.completion_strategy_registry import (
     CompletionStrategyRegistry,
+)
+from modules.replication.application.ports.outbound.latency_recorder import (
+    LatencyRecorder,
 )
 from modules.replication.application.ports.outbound.replication_runner import (
     ReplicationRunner,
@@ -31,10 +37,12 @@ class ReplicationManager:
         planner: ReplicationPlanner,
         executor: ReplicationRunner,
         completion_registry: CompletionStrategyRegistry,
+        latency_recorder: LatencyRecorder,
     ):
         self.planner = planner
         self.runner = executor
         self.completion_registry = completion_registry
+        self.latency_recorder = LatencyRecorder
 
     async def execute(
         self,
@@ -65,8 +73,10 @@ class ReplicationManager:
             k=brs.completion_k,
         )
 
-        result: ExecutionResult = await self.runner.execute(
-            cmd=cmd, plan=plan, policy=policy
+        deadline_at: float = time.perf_counter() + (brs.deadline_ms / 1000.0)
+        result: ExecutionResult = self.runner.execute(
+            cmd=cmd, plan=plan, policy=policy, deadline_at=deadline_at
         )
+        await self.latency_recorder.record(result.node_id, result.latency_ms)
 
         return Response(content=result.body, status_code=result.status)

@@ -3,7 +3,7 @@ import hashlib
 import time
 from asyncio import Task
 
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ClientTimeout
 
 from modules.replication.application.ports.outbound.latency_recorder import (
     LatencyRecorder,
@@ -44,7 +44,11 @@ class AiohttpReplicationRunner(ReplicationRunner):
         self.latency_recorder = latency_recorder
 
     async def execute(
-        self, cmd: ReplicationCommand, plan: ReplicationPlan, policy: CompletionPolicy
+        self,
+        cmd: ReplicationCommand,
+        plan: ReplicationPlan,
+        policy: CompletionPolicy,
+        deadline_at: float,
     ) -> ExecutionResult:
         """Выполняет план репликации.
 
@@ -52,6 +56,7 @@ class AiohttpReplicationRunner(ReplicationRunner):
             cmd: Данные команды репликации
             plan: План репликации
             policy:
+            deadline_at:
 
         Returns:
             Ответ, выбранный политикой завершения.
@@ -61,10 +66,7 @@ class AiohttpReplicationRunner(ReplicationRunner):
         """
         tasks: list[Task[ReplicaReply]] = [
             asyncio.create_task(
-                self._call_one(
-                    target=t,
-                    cmd=cmd,
-                )
+                self._call_one(target=t, cmd=cmd, deadline_at=deadline_at)
             )
             for t in plan.targets
         ]
@@ -74,9 +76,16 @@ class AiohttpReplicationRunner(ReplicationRunner):
             done: set[Task[ReplicaReply]]
 
             while pending:
+                remaining = deadline_at - time.perf_counter()
+                if remaining <= 0:
+                    break
+
                 done, pending = await asyncio.wait(
-                    pending, return_when=asyncio.FIRST_COMPLETED
+                    pending, timeout=remaining, return_when=asyncio.FIRST_COMPLETED
                 )
+
+                if not done:
+                    break
 
                 for task in done:
                     reply: ReplicaReply = await task
@@ -108,9 +117,11 @@ class AiohttpReplicationRunner(ReplicationRunner):
             for t in tasks:
                 if not t.done():
                     t.cancel()
+            if tasks:
+                await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _call_one(
-        self, *, target: ReplicationTarget, cmd: ReplicationCommand
+        self, *, target: ReplicationTarget, cmd: ReplicationCommand, deadline_at: float
     ) -> ReplicaReply:
         """Делает один HTTP вызов к реплике.
 
@@ -124,16 +135,22 @@ class AiohttpReplicationRunner(ReplicationRunner):
         if target.delay_ms > 0:
             await asyncio.sleep(target.delay_ms / 1000.0)
 
+        remaining = deadline_at - time.perf_counter()
+        if remaining <= 0:
+            return _get_empty_replica_reply(node_id=target.node_id, latency_ms=0.0)
+
         url: str = f"http://{target.host}:{target.port}{cmd.path}"
+        timeout = ClientTimeout(total=remaining)
 
         t0: float = time.perf_counter()
         try:
             async with self.client.request(
-                cmd.method,
-                url,
+                method=cmd.method,
+                url=url,
                 params=dict(cmd.query),
                 headers=dict(cmd.headers),
                 data=cmd.body,
+                timeout=timeout,
             ) as resp:
                 raw: bytes = await resp.read()
                 latency_ms: float = (time.perf_counter() - t0) * 1000.0
@@ -149,17 +166,28 @@ class AiohttpReplicationRunner(ReplicationRunner):
                     status=int(resp.status),
                     latency_ms=latency_ms,
                 )
-
+        except asyncio.TimeoutError:
+            return _get_empty_replica_reply(
+                node_id=target.node_id, latency_ms=(time.perf_counter() - t0) * 1000.0
+            )
         except asyncio.CancelledError:
             raise
         except Exception:
-            latency_ms = (time.perf_counter() - t0) * 1000.0
-
-            return ReplicaReply(
+            return _get_empty_replica_reply(
                 node_id=target.node_id,
-                ok=False,
-                value="",
-                raw_body=b"",
+                latency_ms=(time.perf_counter() - t0) * 1000.0,
                 status=599,
-                latency_ms=latency_ms,
             )
+
+
+def _get_empty_replica_reply(
+    node_id: str, latency_ms: float, status: int = 598
+) -> ReplicaReply:
+    return ReplicaReply(
+        node_id=node_id,
+        ok=False,
+        value="",
+        raw_body=b"",
+        status=status,
+        latency_ms=latency_ms,
+    )

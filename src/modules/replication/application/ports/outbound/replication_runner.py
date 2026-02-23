@@ -8,5 +8,9 @@ from modules.replication.domain.model.replication_plan import ReplicationPlan
 
 class ReplicationRunner(Protocol):
     async def execute(
-        self, cmd: ReplicationCommand, plan: ReplicationPlan, policy: CompletionPolicy
+        self,
+        cmd: ReplicationCommand,
+        plan: ReplicationPlan,
+        policy: CompletionPolicy,
+        deadline_at: float,
     ) -> ExecutionResult: ...

@@ -20,7 +20,7 @@ def airm(
     альтернатив по агрегированному индексу.
 
     Args:
-        x_matrix: Матрица решений размера (m, n),
+        x_matrix: Нормализованная матрица решений размера (m, n),
             где m — число альтернатив, n — число критериев.
         w: Номинальный вектор весов критериев размера (n,).
             Все веса должны быть неотрицательными.
@@ -40,6 +40,7 @@ def airm(
         Индекс (0-based) альтернативы с наибольшей
         вероятностью доминирования.
     """
+
     if (w < 0).any():
         raise ValueError("все веса должны быть > 0")
 
@@ -62,19 +63,13 @@ def airm(
             x_adj[:, ~benefit_mask].max(axis=0) - x_adj[:, ~benefit_mask]
         )
 
-    # Нормализация критериев в диапазон [0, 1]
-    col_min: Vector = x_adj.min(axis=0)
-    col_max: Vector = x_adj.max(axis=0)
-    denominator: Vector = np.where(col_max == col_min, 1.0, col_max - col_min)
-    x_norm: Matrix = (x_adj - col_min) / denominator
-
     # Рандомизация весов и подсчёт числа побед каждой альтернативы
     counts: IntVector = np.zeros(m, dtype=int)
     alpha: Vector = w * alpha_scale
 
     for _ in range(n_iter):
         w_rand: Vector = rng.dirichlet(alpha)
-        scores: Vector = x_norm @ w_rand  # агрегированный индекс
+        scores: Vector = x_adj @ w_rand  # агрегированный индекс
         counts[scores.argmax()] += 1  # победитель этой итерации
 
     return counts.astype(float) / float(n_iter)
