@@ -1,0 +1,40 @@
+@startuml
+class ReplicationManager {
+    +execute()
+}
+
+class ReplicationPlanner {
+    +build()
+}
+
+class ReplicationRunner {
+    +execute()
+}
+
+interface ReplicationStrategy
+class FixedParallelReplication
+class HedgedReplication
+class SpeculativeReplication
+
+interface CompletionPolicy
+class FirstValidPolicy
+class MajorityPolicy
+class QuorumPolicy
+class KOutOfNPolicy
+
+ReplicationManager --> ReplicationPlanner
+ReplicationManager --> ReplicationRunner
+ReplicationRunner --> CompletionPolicy
+
+ReplicationPlanner --> ReplicationStrategy
+
+ReplicationStrategy <|.. FixedParallelReplication
+ReplicationStrategy <|.. HedgedReplication
+ReplicationStrategy <|.. SpeculativeReplication
+
+CompletionPolicy <|.. FirstValidPolicy
+CompletionPolicy <|.. MajorityPolicy
+CompletionPolicy <|.. QuorumPolicy
+CompletionPolicy <|.. KOutOfNPolicy
+
+@enduml

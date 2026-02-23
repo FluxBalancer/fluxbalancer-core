@@ -3,6 +3,6 @@ from modules.decision.domain.weights_strategy import WeightsStrategy
 from src.modules.types.numpy import Matrix, Vector
 
 
-class EntropyWeightsProvider(WeightsStrategy):
+class EntropyWeightsStrategy(WeightsStrategy):
     def compute(self, matrix: Matrix) -> Vector:
         return entropy_weights(matrix)

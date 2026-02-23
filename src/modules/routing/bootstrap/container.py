@@ -8,7 +8,7 @@ from modules.decision.adapters.outbound.registries.balancer_strategy_registry im
     AlgorithmName,
 )
 from modules.decision.adapters.outbound.registries.weight_strategy_registry import (
-    WeightsProviderRegistry,
+    WeightsStrategyRegistry,
     WeightsAlgorithmName,
 )
 from modules.decision.application.services.default_decision_resolver import (
@@ -158,7 +158,7 @@ class RoutingModule:
 
     def _init_registries(self) -> None:
         self.balancer_registry = BalancerStrategyRegistry()
-        self.weights_registry = WeightsProviderRegistry()
+        self.weights_registry = WeightsStrategyRegistry()
         self.completion_registry = CompletionStrategyRegistry()
 
     def _init_decision_policy(self) -> None:

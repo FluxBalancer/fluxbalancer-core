@@ -1,0 +1,33 @@
+@startuml
+
+interface RankingStrategy {
+    +score_all(X, w)
+}
+
+interface WeightsStrategy {
+    +compute(X)
+}
+
+interface DecisionResolverPolicy
+
+class ChooseNodeUseCase {
+    -metrics_repo
+    -node_registry
+    -decision_policy
+    +rank_nodes()
+    +execute()
+}
+
+ChooseNodeUseCase --> DecisionResolverPolicy
+DecisionResolverPolicy --> RankingStrategy
+DecisionResolverPolicy --> WeightsStrategy
+
+RankingStrategy <|.. AIRMStrategy
+RankingStrategy <|.. SAWStrategy
+RankingStrategy <|.. TopsisStrategy
+RankingStrategy <|.. ELECTREStrategy
+RankingStrategy <|.. LinearScalarizationStrategy
+
+WeightsStrategy <|.. EntropyWeightsProvider
+
+@enduml

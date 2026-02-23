@@ -17,6 +17,7 @@ from modules.replication.application.ports.outbound.replication_runner import (
 from modules.replication.application.services.replication_planner import (
     ReplicationPlanner,
 )
+from modules.replication.domain.completion import CompletionPolicy
 from modules.replication.domain.model.execution_result import ExecutionResult
 from modules.replication.domain.model.replication_command import ReplicationCommand
 
@@ -42,7 +43,7 @@ class ReplicationManager:
         self.planner = planner
         self.runner = executor
         self.completion_registry = completion_registry
-        self.latency_recorder = LatencyRecorder
+        self.latency_recorder = latency_recorder
 
     async def execute(
         self,
@@ -68,7 +69,7 @@ class ReplicationManager:
             body=await request.body(),
         )
 
-        policy = self.completion_registry.get(
+        policy: CompletionPolicy = self.completion_registry.get(
             brs.completion_strategy_name,
             k=brs.completion_k,
         )

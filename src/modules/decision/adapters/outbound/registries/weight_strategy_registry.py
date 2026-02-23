@@ -1,7 +1,7 @@
 from enum import StrEnum
 
-from modules.decision.adapters.outbound.weights.weights_provider import (
-    EntropyWeightsProvider,
+from modules.decision.adapters.outbound.weights.entropy_weights_strategy import (
+    EntropyWeightsStrategy,
 )
 from core.application.ports.strategy_provider import (
     StrategyProvider,
@@ -14,13 +14,13 @@ class WeightsAlgorithmName(StrEnum):
     FIXED = "fixed"
 
 
-class WeightsProviderRegistry(StrategyProvider[WeightsStrategy]):
+class WeightsStrategyRegistry(StrategyProvider[WeightsStrategy]):
     def __init__(self):
         self._providers: dict[str, WeightsStrategy] = {
-            WeightsAlgorithmName.ENTROPY: EntropyWeightsProvider(),
+            WeightsAlgorithmName.ENTROPY: EntropyWeightsStrategy(),
         }
 
-    def get(self, name: str) -> WeightsStrategy:
+    def get(self, name: str, **kwargs) -> WeightsStrategy:
         try:
             key = WeightsAlgorithmName(name.strip().lower())
             return self._providers[key]
