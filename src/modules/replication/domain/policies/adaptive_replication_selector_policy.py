@@ -22,23 +22,22 @@ class AdaptiveReplicationSelector:
     wa_estimator: WAEstimator
 
     def choose_r(
-        self,
-        latency_hat_ms: list[float],
-        *,
-        r_max: int,
+        self, latency_hat_ms: list[float], *, r_max: int, delays_ms: list[int]
     ) -> int:
         """Выбирает число реплик.
 
         Args:
             latency_hat_ms: Прогнозные задержки узлов в порядке ранга (лучший→худший).
             r_max: Верхняя граница реплик.
+            delays_ms:
 
         Returns:
             Оптимальное r* (минимум 1).
         """
         return adaptive_selector_replicas(
-            replication_count_max=r_max,
+            r_max=r_max,
             lambda_cost=self.lambda_cost,
             wa_estimator=self.wa_estimator,
             latency_hat_ms=latency_hat_ms,
+            delays_ms=delays_ms,
         )

@@ -11,7 +11,9 @@ from modules.replication.domain.policies.adaptive_replication_selector_policy im
 )
 from modules.replication.domain.policies.replication_policy import ReplicationDecision
 from modules.replication.domain.policies.replication_policy import ReplicationPolicy
-from modules.replication.domain.services.fixed_wa import FixedWAEstimator
+from modules.replication.domain.services.work_amplification.universal_wa import (
+    UniversalWAEstimator,
+)
 from src.modules.routing.application.usecase.choose_node import ChooseNodeUseCase
 
 
@@ -82,16 +84,19 @@ class ReplicationPlanner:
         strategy: ReplicationStrategy = self.strategy_registry.get(
             brs.replication_strategy_name
         )
+
+        # строим черновой план на base_r, чтобы получить delay_ms
+        ranked_base: list[tuple[str, str, int]] = ranked[:base_replication_count]
+        draft_plan: ReplicationPlan = await strategy.build(
+            ranked_base, max_replicas=base_replication_count
+        )
+        delays_ms: list[int] = [t.delay_ms for t in draft_plan.targets]
+
         best_replication_count: int = base_replication_count
 
         if self.config.adaptive and base_replication_count > 1:
-            selector = AdaptiveReplicationSelector(
-                lambda_cost=self.config.lambda_cost,
-                wa_estimator=FixedWAEstimator(),
-            )
             latency_hat: list[float] = []
-
-            for node_id, _, _ in ranked:
+            for node_id, _, _ in ranked_base:
                 latest: NodeMetrics | None = await self.metrics_repository.get_latest(
                     node_id
                 )
@@ -100,10 +105,23 @@ class ReplicationPlanner:
                 else:
                     latency_hat.append(float("inf"))
 
+            selector = AdaptiveReplicationSelector(
+                lambda_cost=self.config.lambda_cost,
+                # TODO: давать не p95 latency, а просто latency
+                wa_estimator=UniversalWAEstimator(
+                    latency_samples_ms=self._get_latency_samples_for_wa(latency_hat)
+                ),
+            )
+
             best_replication_count = selector.choose_r(
-                latency_hat, r_max=base_replication_count
+                latency_hat, r_max=base_replication_count, delays_ms=delays_ms
             )
 
         # ограничиваем ranked списком best_replication_count (для fixed), но hedged/speculative сами решат delay
         ranked_cut = ranked[:best_replication_count]
         return await strategy.build(ranked_cut, max_replicas=best_replication_count)
+
+    def _get_latency_samples_for_wa(self, latency_hat: list[float]) -> list[float]:
+        # временный костыль: пока нет реальных сэмплов — хотя бы так
+        # (ниже объясню, что лучше)
+        return [x for x in latency_hat if x != float("inf")]
