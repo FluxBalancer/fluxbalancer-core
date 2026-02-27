@@ -11,12 +11,14 @@ class ReplicationStrategy(Protocol):
         ranked: list[tuple[str, str, int]],
         *,
         max_replicas: int,
+        tau_ms: int | None = None,
     ) -> ReplicationPlan:
         """Формирует план репликации.
 
         Args:
             ranked: Отранжированные узлы (node_id, host, port) по лучшему к худшему.
             max_replicas: Верхняя граница числа реплик.
+            tau_ms
 
         Returns:
             ReplicationPlan.

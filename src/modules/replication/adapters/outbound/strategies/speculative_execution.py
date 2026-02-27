@@ -30,6 +30,7 @@ class SpeculativeReplication(ReplicationStrategy):
         ranked: list[tuple[str, str, int]],
         *,
         max_replicas: int,
+        tau_ms: int | None = None,
     ) -> ReplicationPlan:
         return speculative_execution(
             replication_max_count=self.r_max,

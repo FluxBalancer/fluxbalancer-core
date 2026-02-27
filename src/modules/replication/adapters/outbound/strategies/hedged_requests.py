@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Callable, Awaitable
 
 from modules.replication.adapters.outbound.strategies.base import ReplicationStrategy
 from modules.replication.domain.model.replication_plan import ReplicationPlan
@@ -20,14 +21,16 @@ class HedgedReplication(ReplicationStrategy):
     tau_ms: int
 
     async def build(
-        self,
-        ranked: list[tuple[str, str, int]],
-        *,
-        max_replicas: int,
+            self,
+            ranked: list[tuple[str, str, int]],
+            *,
+            max_replicas: int,
+            tau_ms: int | None = None,
     ) -> ReplicationPlan:
+        effective_tau = int(tau_ms) if tau_ms is not None else int(self.tau_ms)
         return hedged_requests(
             replication_max_count=self.r_max,
-            time_delta_ms=self.tau_ms,
+            time_delta_ms=effective_tau,
             ranked=ranked,
             max_replicas=max_replicas,
         )

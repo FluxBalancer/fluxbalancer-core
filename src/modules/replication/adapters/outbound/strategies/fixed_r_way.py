@@ -19,10 +19,10 @@ class FixedParallelReplication(ReplicationStrategy):
 
     async def build(
         self,
-        # TODO: replace [str, str, int] to normal dataclass
         ranked: list[tuple[str, str, int]],
         *,
         max_replicas: int,
+        tau_ms: int | None = None,
     ) -> ReplicationPlan:
         return fixed_r_way(
             replication_count=self.r, ranked=ranked, max_replicas=max_replicas

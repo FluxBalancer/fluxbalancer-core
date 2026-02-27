@@ -29,7 +29,7 @@ class ReplicationStrategyRegistry(StrategyProvider[ReplicationStrategy]):
     def __init__(self):
         self._map: dict[str, ReplicationStrategy] = {
             ReplicationAlgorithmName.FIXED: FixedParallelReplication(r=2),
-            ReplicationAlgorithmName.HEDGED: HedgedReplication(r_max=3, tau_ms=80),
+            ReplicationAlgorithmName.HEDGED: HedgedReplication(r_max=10, tau_ms=500),
             ReplicationAlgorithmName.SPECULATIVE: SpeculativeReplication(
                 r_max=3, threshold_ms=120
             ),

@@ -178,10 +178,7 @@ class RoutingModule:
 
     def _init_replication_policy(self):
         self.replication_strategy_registry = ReplicationStrategyRegistry()
-        self.replication_policy = ReplicationPolicy(
-            default_replicas=1,
-            max_replicas=5,
-        )
+        self.replication_policy = ReplicationPolicy()
 
         self.replication_planner = ReplicationPlanner(
             chooser=self.choose_node_uc,

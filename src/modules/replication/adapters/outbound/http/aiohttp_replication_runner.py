@@ -1,5 +1,6 @@
 import asyncio
 import hashlib
+import logging
 import time
 from asyncio import Task
 
@@ -22,6 +23,8 @@ from src.modules.replication.domain.completion import (
     ReplicaReply,
 )
 
+logger = logging.getLogger("replication.runner")
+
 
 class AiohttpReplicationRunner(ReplicationRunner):
     """Выполняет репликации (hedged / fixed / speculative) по плану.
@@ -38,21 +41,21 @@ class AiohttpReplicationRunner(ReplicationRunner):
     """
 
     def __init__(
-        self,
-        client: ClientSession,
-        latency_recorder: LatencyRecorder,
-        completion_policy_strategy: StrategyProvider[CompletionPolicy],
+            self,
+            client: ClientSession,
+            latency_recorder: LatencyRecorder,
+            completion_policy_strategy: StrategyProvider[CompletionPolicy],
     ):
         self.client = client
         self.latency_recorder = latency_recorder
         self.completion_policy_strategy = completion_policy_strategy
 
     async def execute(
-        self,
-        cmd: ReplicationCommand,
-        plan: ReplicationPlan,
-        policy_input: CompletionPolicyInput,
-        deadline_at: float,
+            self,
+            cmd: ReplicationCommand,
+            plan: ReplicationPlan,
+            policy_input: CompletionPolicyInput,
+            deadline_at: float,
     ) -> ExecutionResult:
         """Выполняет план репликации.
 
@@ -71,6 +74,8 @@ class AiohttpReplicationRunner(ReplicationRunner):
         completion_strategy: CompletionPolicy = self.completion_policy_strategy.get(
             name=policy_input.strategy_name, k=policy_input.k
         )
+
+        logger.info(f"Replication targets: {plan.targets}")
 
         tasks: list[Task[ReplicaReply]] = [
             asyncio.create_task(
@@ -129,7 +134,7 @@ class AiohttpReplicationRunner(ReplicationRunner):
                 await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _call_one(
-        self, *, target: ReplicationTarget, cmd: ReplicationCommand, deadline_at: float
+            self, *, target: ReplicationTarget, cmd: ReplicationCommand, deadline_at: float
     ) -> ReplicaReply:
         """Делает один HTTP вызов к реплике.
 
@@ -147,18 +152,20 @@ class AiohttpReplicationRunner(ReplicationRunner):
         if remaining <= 0:
             return _get_empty_replica_reply(node_id=target.node_id, latency_ms=0.0)
 
+        logger.info(f"Create replication on {target.host}:{target.port}")
+
         url: str = f"http://{target.host}:{target.port}{cmd.path}"
         timeout = ClientTimeout(total=remaining)
 
         t0: float = time.perf_counter()
         try:
             async with self.client.request(
-                method=cmd.method,
-                url=url,
-                params=dict(cmd.query),
-                headers=dict(cmd.headers),
-                data=cmd.body,
-                timeout=timeout,
+                    method=cmd.method,
+                    url=url,
+                    params=dict(cmd.query),
+                    headers=dict(cmd.headers),
+                    data=cmd.body,
+                    timeout=timeout,
             ) as resp:
                 raw: bytes = await resp.read()
                 latency_ms: float = (time.perf_counter() - t0) * 1000.0
@@ -189,7 +196,7 @@ class AiohttpReplicationRunner(ReplicationRunner):
 
 
 def _get_empty_replica_reply(
-    node_id: str, latency_ms: float, status: int = 598
+        node_id: str, latency_ms: float, status: int = 598
 ) -> ReplicaReply:
     return ReplicaReply(
         node_id=node_id,
