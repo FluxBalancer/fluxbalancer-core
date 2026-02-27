@@ -26,21 +26,20 @@ class MetricsService(metrics_pb2_grpc.MetricsServiceServicer):
     ):
         peer: str = context.peer()
         ip: str = peer.split(":")[1]
+        node_id: str = f"{ip}_{request.node_id}"
 
         if ip and request.port:
-            self.node_registry.update(
-                node_id=request.node_id, host=ip, port=request.port
-            )
+            self.node_registry.update(node_id=node_id, host=ip, port=request.port)
 
         node_metric = NodeMetrics(
             timestamp=str(NodeMetrics.now()),
-            node_id=request.node_id,
+            node_id=node_id,
             cpu_util=float(request.cpu_util),
             mem_util=float(request.mem_util),
             net_in_bytes=int(request.net_in_bytes),
             net_out_bytes=int(request.net_out_bytes),
         )
-        logger.info({"message": "get metrics", "metrics": {**asdict(node_metric)}})
+        # logger.info({"message": "get metrics", "metrics": {**asdict(node_metric)}})
         await self.metrics_repo.upsert(node_metric)
 
         return metrics_pb2.Ack(ok=True)

@@ -12,7 +12,7 @@ class BRSParser:
     или некорректных значениях выбрасывает исключение.
 
     Поддерживаемые заголовки:
-      - X-Service (str, обязателен)
+      - X-Service (str, опционален)
 
       - X-Replications-Count (int | "true", опционален)
       - X-Replications-All (bool, опционален)
@@ -129,7 +129,7 @@ class BRSParser:
     def _parse_service(headers: Headers) -> str:
         service: str | None = headers.get("X-Service")
         if not service:
-            raise ValueError("BRS: отсутствует обязательный заголовок X-Service")
+            return ""
         return service
 
     @staticmethod

@@ -19,8 +19,8 @@ class InMemoryMetricsRepository(MetricsRepository):
 
     def __init__(
         self,
-        history_limit: int = 32,
-        latency_window: int = 100,
+        history_limit: int = 128,
+        latency_window: int = 400,
     ):
         self._lock = RLock()
         self._history: dict[str, deque[NodeMetrics]] = defaultdict(

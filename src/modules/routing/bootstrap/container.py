@@ -87,7 +87,7 @@ class RoutingModule:
 
         self.replication_policy: ReplicationPolicy
         self.replication_planner: ReplicationPlanner
-        self.replication_executor: AiohttpReplicationRunner = None
+        self.replication_runner: AiohttpReplicationRunner = None
         self.replication_manager: ReplicationManager = None
         self.replication_strategy_registry: StrategyProvider[ReplicationStrategy]
 
@@ -102,7 +102,7 @@ class RoutingModule:
         self._init_replication_policy()
 
     async def init_async(self, client_session: ClientSession):
-        self.replication_executor = AiohttpReplicationRunner(
+        self.replication_runner = AiohttpReplicationRunner(
             client=client_session,
             latency_recorder=self.latency_recorder,
             completion_policy_strategy=self.completion_registry,
@@ -110,7 +110,7 @@ class RoutingModule:
 
         self.replication_manager = ReplicationManager(
             planner=self.replication_planner,
-            executor=self.replication_executor,
+            executor=self.replication_runner,
         )
 
         self.proxy_use_case = ProxyRequestUseCase(
@@ -191,5 +191,5 @@ class RoutingModule:
             config=PlannerConfig(adaptive=True, lambda_cost=1.0),
         )
 
-        self.replication_executor = None
+        self.replication_runner = None
         self.replication_manager = None

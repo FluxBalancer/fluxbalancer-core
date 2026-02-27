@@ -69,4 +69,6 @@ class ReplicationManager:
             deadline_at=deadline_at,
         )
 
-        return Response(content=result.body, status_code=result.status)
+        sockets = ", ".join([f"{target.host}:{target.port}" for target in plan.targets])
+
+        return Response(content=result.body, status_code=result.status), sockets

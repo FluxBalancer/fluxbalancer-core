@@ -21,7 +21,6 @@ class UniversalWAEstimator(WAEstimator):
 
     latency_samples_ms: list[float]
 
-
     def delta_wa(self, *, delay_ms: float, prev_finish_hat_ms: float) -> float:
         if delay_ms <= 0:
             return 1.0  # старт сразу => почти наверняка "запустится"

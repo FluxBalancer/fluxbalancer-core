@@ -78,7 +78,7 @@ class ChooseNodeUseCase(ChooseNodePort):
 
         ranked: list[tuple[str, str, int]] = []
         for idx in order.tolist():
-            node = metrics[int(idx)]
+            node: NodeMetrics = metrics[int(idx)]
             host, port = self.node_registry.get_endpoint(node.node_id)
             ranked.append((node.node_id, host, port))
         return ranked

@@ -17,7 +17,7 @@ def create_app() -> FastAPI:
 
     app.include_router(ChooseNodeRouter(metrics_agg_repo=module.metrics_agg).router)
 
-    app.add_middleware(ProxyMiddleware, proxy_use_case=module.proxy_use_case)
+    app.add_middleware(ProxyMiddleware)
 
     return app
 
@@ -28,5 +28,4 @@ if __name__ == "__main__":
         app,
         port=8000,
         loop="asyncio",
-        factory=False,
     )

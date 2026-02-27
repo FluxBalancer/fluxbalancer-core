@@ -16,6 +16,7 @@ async def lifespan(app: FastAPI, module: RoutingModule):
         timeout=aiohttp.ClientTimeout(total=30),
     )
     await module.init_async(app.state.clientSession)
+    app.state.proxy_use_case = module.proxy_use_case
 
     app.state.grpc_server = await start_grpc_metrics_server(
         repo=module.metrics_repo,
