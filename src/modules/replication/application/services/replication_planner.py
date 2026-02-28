@@ -7,7 +7,9 @@ from modules.gateway.application.dto.brs import BRSRequest
 from modules.observability.application.ports.metrics_repository import MetricsRepository
 from modules.observability.domain.node_metrics import NodeMetrics
 from modules.replication.adapters.outbound.strategies.base import ReplicationStrategy
-from modules.replication.adapters.outbound.strategies.hedged_requests import HedgedReplication
+from modules.replication.adapters.outbound.strategies.hedged_requests import (
+    HedgedReplication,
+)
 from modules.replication.domain.model.replication_plan import ReplicationPlan
 from modules.replication.domain.policies.adaptive_replication_selector_policy import (
     AdaptiveReplicationSelector,
@@ -48,13 +50,13 @@ class ReplicationPlanner:
     """
 
     def __init__(
-            self,
-            chooser: ChooseNodeUseCase,
-            policy: ReplicationPolicy,
-            strategy_registry: StrategyProvider[ReplicationStrategy],
-            metrics_repository: MetricsRepository,
-            *,
-            config: PlannerConfig = PlannerConfig(),
+        self,
+        chooser: ChooseNodeUseCase,
+        policy: ReplicationPolicy,
+        strategy_registry: StrategyProvider[ReplicationStrategy],
+        metrics_repository: MetricsRepository,
+        *,
+        config: PlannerConfig = PlannerConfig(),
     ):
         self.metrics_repository = metrics_repository
         self.chooser = chooser
@@ -80,8 +82,7 @@ class ReplicationPlanner:
 
         base_replication_count: int = self.policy.resolve_count(
             ReplicationDecision(
-                replicate_all=brs.replicate_all,
-                requested_count=brs.replications_count
+                replicate_all=brs.replicate_all, requested_count=brs.replications_count
             ),
             available_nodes=len(ranked),
         )
@@ -92,7 +93,9 @@ class ReplicationPlanner:
 
         latency_hat: list[float] = []
         for node_id, _, _ in ranked_base:
-            latest: NodeMetrics | None = await self.metrics_repository.get_latest(node_id)
+            latest: NodeMetrics | None = await self.metrics_repository.get_latest(
+                node_id
+            )
             if latest and latest.latency_ms is not None:
                 latency_hat.append(float(latest.latency_ms))
             else:
@@ -124,9 +127,7 @@ class ReplicationPlanner:
             )
 
             draft_plan: ReplicationPlan = await strategy.build(
-                ranked_base,
-                max_replicas=base_replication_count,
-                tau_ms=tau_ms
+                ranked_base, max_replicas=base_replication_count, tau_ms=tau_ms
             )
             delays_ms: list[int] = [t.delay_ms for t in draft_plan.targets]
 
@@ -135,12 +136,12 @@ class ReplicationPlanner:
             )
 
         # ограничиваем ranked списком best_replication_count (для fixed), но hedged/speculative сами решат delay
-        ranked_cut = ranked[:best_replication_count]
-        return await strategy.build(
-            ranked_cut,
-            max_replicas=best_replication_count,
-            tau_ms=tau_ms
+        ranked_cut: list[tuple[str, str, int]] = ranked[:best_replication_count]
+        plan: ReplicationPlan = await strategy.build(
+            ranked_cut, max_replicas=best_replication_count, tau_ms=tau_ms
         )
+        plan.r_eff = best_replication_count
+        return plan
 
     def _get_latency_samples_for_wa(self, latency_hat: list[float]) -> list[float]:
         # временный костыль: пока нет реальных сэмплов — хотя бы так
@@ -148,15 +149,15 @@ class ReplicationPlanner:
         return [x for x in latency_hat if x != float("inf")]
 
     def _compute_tau_ms(
-            self,
-            brs: BRSRequest,
-            *,
-            latency_hat_ms: list[float],
-            default_tau_ms: int = 80,
-            min_tau_ms: int = 20,
-            max_tau_ms: int = 5000,
-            quantile: float = 0.75,
-            jitter: float = 0.10,
+        self,
+        brs: BRSRequest,
+        *,
+        latency_hat_ms: list[float],
+        default_tau_ms: int = 80,
+        min_tau_ms: int = 20,
+        max_tau_ms: int = 5000,
+        quantile: float = 0.75,
+        jitter: float = 0.10,
     ) -> int:
         vals = [x for x in latency_hat_ms if math.isfinite(x) and x > 0]
         if not vals:

@@ -21,11 +21,11 @@ class HedgedReplication(ReplicationStrategy):
     tau_ms: int
 
     async def build(
-            self,
-            ranked: list[tuple[str, str, int]],
-            *,
-            max_replicas: int,
-            tau_ms: int | None = None,
+        self,
+        ranked: list[tuple[str, str, int]],
+        *,
+        max_replicas: int,
+        tau_ms: int | None = None,
     ) -> ReplicationPlan:
         effective_tau = int(tau_ms) if tau_ms is not None else int(self.tau_ms)
         return hedged_requests(

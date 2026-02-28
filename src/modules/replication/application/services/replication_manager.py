@@ -71,4 +71,11 @@ class ReplicationManager:
 
         sockets = ", ".join([f"{target.host}:{target.port}" for target in plan.targets])
 
-        return Response(content=result.body, status_code=result.status), sockets
+        return (
+            Response(
+                content=result.body,
+                status_code=result.status,
+                headers=result.headers or {},
+            ),
+            sockets,
+        )

@@ -36,7 +36,7 @@ class ProxyMiddleware(BaseHTTPMiddleware):
                 status_code=503,
             )
 
-        headers = result.headers
+        headers = dict(result.headers or {})
         headers["X-Upstream-Socket"] = result.socket
         return Response(
             content=result.body,

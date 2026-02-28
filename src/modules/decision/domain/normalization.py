@@ -20,9 +20,7 @@ def normalize_cost(x: Matrix) -> Matrix:
     denominator: Vector = col_max - col_min
     # где denominator невалиден/0 -> ставим 1, чтобы избежать nan/inf
     denominator: Vector = np.where(
-        ~np.isfinite(denominator) | (denominator == 0),
-        1.0,
-        denominator
+        ~np.isfinite(denominator) | (denominator == 0), 1.0, denominator
     )
 
     y = (x - col_min) / denominator

@@ -7,6 +7,9 @@ from asyncio import Task
 from aiohttp import ClientSession, ClientTimeout
 
 from core.application.ports.strategy_provider import StrategyProvider
+from modules.replication.adapters.outbound.registries.completion_strategy_registry import (
+    CompletionAlgorithmName,
+)
 from modules.replication.application.ports.outbound.latency_recorder import (
     LatencyRecorder,
 )
@@ -41,21 +44,21 @@ class AiohttpReplicationRunner(ReplicationRunner):
     """
 
     def __init__(
-            self,
-            client: ClientSession,
-            latency_recorder: LatencyRecorder,
-            completion_policy_strategy: StrategyProvider[CompletionPolicy],
+        self,
+        client: ClientSession,
+        latency_recorder: LatencyRecorder,
+        completion_policy_strategy: StrategyProvider[CompletionPolicy],
     ):
         self.client = client
         self.latency_recorder = latency_recorder
         self.completion_policy_strategy = completion_policy_strategy
 
     async def execute(
-            self,
-            cmd: ReplicationCommand,
-            plan: ReplicationPlan,
-            policy_input: CompletionPolicyInput,
-            deadline_at: float,
+        self,
+        cmd: ReplicationCommand,
+        plan: ReplicationPlan,
+        policy_input: CompletionPolicyInput,
+        deadline_at: float,
     ) -> ExecutionResult:
         """Выполняет план репликации.
 
@@ -87,7 +90,6 @@ class AiohttpReplicationRunner(ReplicationRunner):
         try:
             pending: set[Task[ReplicaReply]] = set(tasks)
             done: set[Task[ReplicaReply]]
-
             while pending:
                 remaining = deadline_at - time.perf_counter()
                 if remaining <= 0:
@@ -105,7 +107,7 @@ class AiohttpReplicationRunner(ReplicationRunner):
                     completion_strategy.push(reply)
 
                     if completion_strategy.is_done():
-                        winner = completion_strategy.choose()
+                        winner: ReplicaReply = completion_strategy.choose()
 
                         for p in pending:
                             p.cancel()
@@ -119,7 +121,15 @@ class AiohttpReplicationRunner(ReplicationRunner):
                             node_id=winner.node_id,
                             status=winner.status,
                             body=winner.raw_body,
-                            headers={},
+                            headers={
+                                "X-Replica-Count": str(len(plan.targets)),
+                                "X-Replica-Effective": str(
+                                    plan.r_eff or len(plan.targets)
+                                ),
+                                "X-Completion-Strategy": policy_input.strategy_name
+                                or CompletionAlgorithmName.FIRST.value,
+                                "X-Winner-Socket": winner.node_id,
+                            },
                             latency_ms=winner.latency_ms,
                         )
 
@@ -134,7 +144,7 @@ class AiohttpReplicationRunner(ReplicationRunner):
                 await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _call_one(
-            self, *, target: ReplicationTarget, cmd: ReplicationCommand, deadline_at: float
+        self, *, target: ReplicationTarget, cmd: ReplicationCommand, deadline_at: float
     ) -> ReplicaReply:
         """Делает один HTTP вызов к реплике.
 
@@ -160,12 +170,12 @@ class AiohttpReplicationRunner(ReplicationRunner):
         t0: float = time.perf_counter()
         try:
             async with self.client.request(
-                    method=cmd.method,
-                    url=url,
-                    params=dict(cmd.query),
-                    headers=dict(cmd.headers),
-                    data=cmd.body,
-                    timeout=timeout,
+                method=cmd.method,
+                url=url,
+                params=dict(cmd.query),
+                headers=dict(cmd.headers),
+                data=cmd.body,
+                timeout=timeout,
             ) as resp:
                 raw: bytes = await resp.read()
                 latency_ms: float = (time.perf_counter() - t0) * 1000.0
@@ -186,6 +196,7 @@ class AiohttpReplicationRunner(ReplicationRunner):
                 node_id=target.node_id, latency_ms=(time.perf_counter() - t0) * 1000.0
             )
         except asyncio.CancelledError:
+            logger.debug(f"Replication cancelled for {target.node_id}")
             raise
         except Exception:
             return _get_empty_replica_reply(
@@ -196,7 +207,7 @@ class AiohttpReplicationRunner(ReplicationRunner):
 
 
 def _get_empty_replica_reply(
-        node_id: str, latency_ms: float, status: int = 598
+    node_id: str, latency_ms: float, status: int = 598
 ) -> ReplicaReply:
     return ReplicaReply(
         node_id=node_id,

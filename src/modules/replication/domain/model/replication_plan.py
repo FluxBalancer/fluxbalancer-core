@@ -8,3 +8,4 @@ class ReplicationPlan:
     """План репликации запроса."""
 
     targets: list[ReplicationTarget]
+    r_eff: int | None = None
