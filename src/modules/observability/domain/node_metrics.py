@@ -18,14 +18,12 @@ class NodeMetrics:
         self,
         interval: float,
         prev: NodeMetrics | None = None,
-        nic_gbps: int = 1,
     ) -> list[float]:
         """Преобразует метрику в числовой вектор для MCDM.
 
         Args:
             prev: Предыдущий снимок той же ноды.
             interval: Шаг измерения (секунды).
-            nic_gbps: Пропускная способность сетевого интерфейса.
         """
         cpu = self.cpu_util
         mem = self.mem_util
@@ -37,8 +35,7 @@ class NodeMetrics:
         else:
             net_Bps = 0.0
 
-        nic_Bps = nic_gbps * 125_000_000
-        net_util = net_Bps / nic_Bps
+        net_util = net_Bps
 
         lat = self.latency_ms if self.latency_ms is not None else float("inf")
 

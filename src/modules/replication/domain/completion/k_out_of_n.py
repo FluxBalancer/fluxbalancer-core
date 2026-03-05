@@ -14,16 +14,16 @@ class KOutOfNPolicy(CompletionPolicy):
         if k <= 0:
             raise ValueError("k должно быть > 0")
         self.k = k
-        self._valid: list[ReplicaReply] = []
+        self.replies: list[ReplicaReply] = []
 
     def push(self, reply: ReplicaReply) -> None:
         if reply.ok:
-            self._valid.append(reply)
+            self.replies.append(reply)
 
     def is_done(self) -> bool:
-        return len(self._valid) >= self.k
+        return len(self.replies) >= self.k
 
     def choose(self) -> ReplicaReply:
         if not self.is_done():
             raise RuntimeError("KOutOfNPolicy: недостаточно валидных ответов")
-        return min(self._valid, key=lambda r: r.latency_ms)
+        return min(self.replies, key=lambda r: r.latency_ms)

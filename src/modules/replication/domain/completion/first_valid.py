@@ -9,10 +9,12 @@ class FirstValidPolicy(CompletionPolicy):
     """
 
     def __init__(self) -> None:
+        self.replies: list[ReplicaReply] = []
         self._winner: ReplicaReply | None = None
 
     def push(self, reply: ReplicaReply) -> None:
         if self._winner is None and reply.ok:
+            self.replies = [reply]
             self._winner = reply
 
     def is_done(self) -> bool:

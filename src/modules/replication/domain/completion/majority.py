@@ -9,17 +9,17 @@ class MajorityPolicy(CompletionPolicy):
     """
 
     def __init__(self) -> None:
-        self._received: list[ReplicaReply] = []
+        self.replies: list[ReplicaReply] = []
         self._counts: dict[str, int] = {}
 
     def push(self, reply: ReplicaReply) -> None:
-        self._received.append(reply)
+        self.replies.append(reply)
 
         if reply.ok:
             self._counts[reply.value] = self._counts.get(reply.value, 0) + 1
 
     def is_done(self) -> bool:
-        n = len(self._received)
+        n = len(self.replies)
         if n == 0:
             return False
 
@@ -30,11 +30,11 @@ class MajorityPolicy(CompletionPolicy):
         if not self.is_done():
             raise RuntimeError("MajorityPolicy: большинство не достигнуто")
 
-        n = len(self._received)
+        n = len(self.replies)
         q_min = (n // 2) + 1
 
         winners = {v for v, c in self._counts.items() if c >= q_min}
 
-        candidates = [r for r in self._received if r.ok and r.value in winners]
+        candidates = [r for r in self.replies if r.ok and r.value in winners]
 
         return min(candidates, key=lambda r: r.latency_ms)

@@ -26,6 +26,8 @@ class ReplicaReply:
 class CompletionPolicy(Protocol):
     """Интерфейс политики завершения реплицированного запроса."""
 
+    replies: list[ReplicaReply]
+
     def push(self, reply: ReplicaReply) -> None:
         """Добавляет очередной ответ реплики."""
         ...
