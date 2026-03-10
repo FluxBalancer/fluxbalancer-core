@@ -24,6 +24,8 @@ class BRSRequest:
 
         completion_strategy_name: Имя стратегии завершения репликации
         completion_k: Количество ответов для завершения репликации (нужно только для QUORUM и K_OUT_OF_N)
+
+        replications_adaptive: Флаг для включения адаптивного ограничения реплик
     """
 
     service: str | None
@@ -37,3 +39,5 @@ class BRSRequest:
 
     completion_strategy_name: str | None
     completion_k: int | None
+
+    replications_adaptive: bool | None

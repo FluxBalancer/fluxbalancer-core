@@ -22,11 +22,11 @@ from modules.replication.domain.services.work_amplification.universal_wa import 
 from src.modules.routing.application.usecase.choose_node import ChooseNodeUseCase
 
 
+# TODO: extract adaptive and lambda to BRS
 @dataclass(slots=True)
 class PlannerConfig:
     """Конфигурация планировщика репликации."""
 
-    adaptive: bool = False
     lambda_cost: float = 0.5  # цена WA (под SLA)
 
 
@@ -107,7 +107,7 @@ class ReplicationPlanner:
 
         best_replication_count: int = base_replication_count
 
-        if self.config.adaptive and base_replication_count > 1:
+        if brs.replications_adaptive and base_replication_count > 1:
             latency_hat: list[float] = []
             for node_id, _, _ in ranked_base:
                 latest: NodeMetrics | None = await self.metrics_repository.get_latest(

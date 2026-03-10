@@ -35,7 +35,7 @@ class NodeMetrics:
         else:
             net_Bps = 0.0
 
-        net_util = net_Bps
+        net_util = net_Bps / (1 * 125_000_000)
 
         lat = self.latency_ms if self.latency_ms is not None else float("inf")
 

@@ -321,3 +321,25 @@ class RedisMetricsRepository(MetricsRepository):
             )
 
         return result
+
+    async def clear(self) -> None:
+        """
+        Полностью очищает хранилище метрик.
+
+        Удаляет:
+        - множество зарегистрированных узлов
+        - последние метрики
+        - историю метрик
+        - latency окна
+        """
+        node_ids = await self.redis.smembers(self._k_nodes())
+
+        async with self.redis.pipeline(transaction=True) as pipe:
+            for node_id in node_ids:
+                await pipe.delete(self._k_latest(node_id))
+                await pipe.delete(self._k_history(node_id))
+                await pipe.delete(self._k_latency(node_id))
+
+            await pipe.delete(self._k_nodes())
+
+            await pipe.execute()

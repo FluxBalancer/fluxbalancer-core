@@ -12,6 +12,10 @@ def electre(x_matrix: Matrix, w: Vector) -> Vector:
     Индекс лучшего варианта по ELECTRE III (упрощённо)
     """
     m, n = x_matrix.shape
+
+    ranges = x_matrix.max(axis=0) - x_matrix.min(axis=0)
+    ranges[ranges == 0] = 1
+
     concordance: Matrix = np.zeros((m, m))
     discordance: Matrix = np.zeros((m, m))
 
@@ -23,9 +27,10 @@ def electre(x_matrix: Matrix, w: Vector) -> Vector:
             mask: BoolVector = x_matrix[i] <= x_matrix[j]  # cost-критерий
             concordance[i, j] = w[mask].sum()
 
-            # несогласие: макс относительного проигрыша
-            diff: Vector = x_matrix[i] - x_matrix[j]
-            discordance[i, j] = diff.max()
+            diff: Vector = (x_matrix[i] - x_matrix[j]) / ranges
+            mask: Vector = diff > 0
+
+            discordance[i, j] = diff[mask].max() if mask.any() else 0
 
     outrank: BoolVector = (concordance >= _CONC_THRESHOLD) & (
         discordance <= _DIS_THRESHOLD

@@ -1,3 +1,5 @@
+import logging
+
 from starlette.datastructures import Headers
 from starlette.requests import Request
 
@@ -24,6 +26,8 @@ class BRSParser:
 
       - X-Completion-Strategy (str, опционален)
       - X-Completion-K (int, опционален)
+
+      - X-Replications-Adaptive (bool, опционален)
     """
 
     DEFAULT_REPLICATIONS = 3
@@ -57,6 +61,9 @@ class BRSParser:
         completion_strategy_name = cls._parse_completion_strategy(headers)
         completion_k = cls._parse_completion_k(headers)
 
+        replications_adaptive = cls._parse_replications_adaptive(headers)
+        logging.Logger("123").info(replications_adaptive)
+
         return BRSRequest(
             service=service,
             replications_count=replications_count,
@@ -67,7 +74,17 @@ class BRSParser:
             replication_strategy_name=replication_strategy,
             completion_strategy_name=completion_strategy_name,
             completion_k=completion_k,
+            replications_adaptive=replications_adaptive,
         )
+
+    @staticmethod
+    def _parse_replications_adaptive(headers: Headers) -> bool | None:
+        value: str = headers.get("X-Replications-Adaptive", "true").lower()
+
+        if value not in {"true", "false"}:
+            return None
+
+        return value == "true"
 
     @staticmethod
     def _parse_completion_strategy(headers: Headers) -> str | None:

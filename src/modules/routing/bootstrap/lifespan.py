@@ -11,11 +11,9 @@ from src.modules.routing.bootstrap.container import RoutingModule
 
 @asynccontextmanager
 async def lifespan(app: FastAPI, module: RoutingModule):
-    app.state.clientSession = aiohttp.ClientSession(
-        connector=aiohttp.TCPConnector(limit=1000, ttl_dns_cache=300),
-        timeout=aiohttp.ClientTimeout(total=30),
-    )
+    app.state.clientSession = aiohttp.ClientSession()
     await module.init_async(app.state.clientSession)
+
     app.state.proxy_use_case = module.proxy_use_case
 
     app.state.grpc_server = await start_grpc_metrics_server(

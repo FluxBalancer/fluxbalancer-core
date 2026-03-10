@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import time
 from dataclasses import dataclass
@@ -70,21 +71,29 @@ class ProxyRequestUseCase:
         target_url = f"http://{host}:{port}{request.url.path}"
 
         start = time.perf_counter()
-        async with self.client.request(
-            request.method,
-            target_url,
-            params=request.query_params,
-            headers=dict(request.headers),
-            data=await request.body(),
-        ) as resp:
-            body = await resp.read()
-            latency_ms = (time.perf_counter() - start) * 1000
+        try:
+            async with self.client.request(
+                request.method,
+                target_url,
+                params=request.query_params,
+                headers=dict(request.headers),
+                data=await request.body(),
+            ) as resp:
+                body = await resp.read()
+                latency_ms = (time.perf_counter() - start) * 1000
 
-            await self.metrics_repo.add_latency(node_id, latency_ms)
+                await self.metrics_repo.add_latency(node_id, latency_ms)
 
+                return ProxyResult(
+                    socket=f"{host}:{port}",
+                    body=body,
+                    status=resp.status,
+                    headers=dict(resp.headers),
+                )
+        except asyncio.TimeoutError as e:
             return ProxyResult(
                 socket=f"{host}:{port}",
-                body=body,
-                status=resp.status,
-                headers=dict(resp.headers),
+                body=b"",
+                status=500,
+                headers={},
             )
