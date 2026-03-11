@@ -1,10 +1,12 @@
-import math
 import random
 from dataclasses import dataclass
+
+import numpy as np
 
 from core.application.ports.strategy_provider import StrategyProvider
 from modules.gateway.application.dto.brs import BRSRequest
 from modules.observability.application.ports.metrics_repository import MetricsRepository
+from modules.observability.application.services.latency_predictor import LatencyPredictor
 from modules.observability.domain.node_metrics import NodeMetrics
 from modules.replication.adapters.outbound.strategies.base import ReplicationStrategy
 from modules.replication.adapters.outbound.strategies.hedged_requests import (
@@ -50,15 +52,16 @@ class ReplicationPlanner:
     """
 
     def __init__(
-        self,
-        chooser: ChooseNodeUseCase,
-        policy: ReplicationPolicy,
-        strategy_registry: StrategyProvider[ReplicationStrategy],
-        metrics_repository: MetricsRepository,
-        *,
-        config: PlannerConfig = PlannerConfig(),
+            self,
+            chooser: ChooseNodeUseCase,
+            policy: ReplicationPolicy,
+            strategy_registry: StrategyProvider[ReplicationStrategy],
+            metrics_repository: MetricsRepository,
+            *,
+            config: PlannerConfig = PlannerConfig(),
     ):
         self.metrics_repository = metrics_repository
+        self.predictor = LatencyPredictor(metrics_repository)
         self.chooser = chooser
         self.policy = policy
         self.strategy_registry = strategy_registry
@@ -92,37 +95,26 @@ class ReplicationPlanner:
         ranked_base: list[tuple[str, str, int]] = ranked[:base_replication_count]
 
         latency_hat: list[float] = []
+        samples: list[float] = []
+
         for node_id, _, _ in ranked_base:
-            latest: NodeMetrics | None = await self.metrics_repository.get_latest(
-                node_id
-            )
-            if latest and latest.latency_ms is not None:
-                latency_hat.append(float(latest.latency_ms))
-            else:
-                latency_hat.append(float("inf"))
+            predicted: float = await self.predictor.predict(node_id)
+            latency_hat.append(predicted)
+
+            node_samples = await self.metrics_repository.get_latency_samples(node_id)
+            samples.extend(node_samples)
 
         tau_ms: int | None = None
         if isinstance(strategy, HedgedReplication):
-            tau_ms = self._compute_tau_ms(brs, latency_hat_ms=latency_hat)
+            tau_ms = compute_tau_ms(brs=brs, latency_samples_ms=samples)
 
         best_replication_count: int = base_replication_count
 
         if brs.replications_adaptive and base_replication_count > 1:
-            latency_hat: list[float] = []
-            for node_id, _, _ in ranked_base:
-                latest: NodeMetrics | None = await self.metrics_repository.get_latest(
-                    node_id
-                )
-                if latest and latest.latency_ms is not None:
-                    latency_hat.append(float(latest.latency_ms))
-                else:
-                    latency_hat.append(float("inf"))
-
             selector = AdaptiveReplicationSelector(
                 lambda_cost=self.config.lambda_cost,
-                # TODO: давать не p95 latency, а просто latency
                 wa_estimator=UniversalWAEstimator(
-                    latency_samples_ms=self._get_latency_samples_for_wa(latency_hat)
+                    latency_samples_ms=samples
                 ),
             )
 
@@ -143,45 +135,60 @@ class ReplicationPlanner:
         plan.r_eff = best_replication_count
         return plan
 
-    def _get_latency_samples_for_wa(self, latency_hat: list[float]) -> list[float]:
-        # временный костыль: пока нет реальных сэмплов — хотя бы так
-        # (ниже объясню, что лучше)
-        return [x for x in latency_hat if x != float("inf")]
 
-    def _compute_tau_ms(
-        self,
+def compute_tau_ms(
         brs: BRSRequest,
         *,
-        latency_hat_ms: list[float],
+        latency_samples_ms: list[float],
         default_tau_ms: int = 80,
         min_tau_ms: int = 20,
         max_tau_ms: int = 5000,
-        quantile: float = 0.75,
+        percentile: float = 50,
         jitter: float = 0.10,
-    ) -> int:
-        vals = [x for x in latency_hat_ms if math.isfinite(x) and x > 0]
-        if not vals:
-            base = default_tau_ms
-        else:
-            vals_sorted = sorted(vals)
-            # квантиль без numpy
-            idx = int(round((len(vals_sorted) - 1) * quantile))
-            base = int(vals_sorted[idx])
+) -> int:
+    """
+    Вычисляет задержку запуска дополнительной реплики (τ).
 
-        # привязка к дедлайну: tau не должен быть слишком большим
-        # разумно: не больше 15% дедлайна (если задан)
-        if brs.deadline_ms:
-            try:
-                dl = int(brs.deadline_ms)
-                if dl > 0:
-                    base = min(base, max(1, int(dl * 0.15)))
-            except Exception:
-                pass
+    Логика:
+    - τ ≈ median latency (p50)
+    - если мало данных → fallback на default_tau_ms
+    - τ ограничивается долей дедлайна
+    - добавляется небольшой jitter для предотвращения синхронизации
 
-        base = max(min_tau_ms, min(max_tau_ms, int(base)))
+    Args:
+        brs:
+        latency_samples_ms: наблюдения latency
+        default_tau_ms:
+        min_tau_ms:
+        max_tau_ms:
+        percentile: используемый процентиль (обычно 50–60)
+        jitter:
+    """
 
-        if jitter > 0:
-            base = int(base * random.uniform(1.0 - jitter, 1.0 + jitter))
-            base = max(min_tau_ms, min(max_tau_ms, base))
+    samples = np.asarray(latency_samples_ms, dtype=float)
 
-        return base
+    samples = samples[np.isfinite(samples)]
+    samples = samples[samples > 0]
+
+    if samples.size == 0:
+        tau = default_tau_ms
+    else:
+        tau = float(np.percentile(samples, percentile))
+
+    # ограничение по дедлайну
+    if brs.deadline_ms:
+        try:
+            dl = float(brs.deadline_ms)
+
+            if dl > 0:
+                tau = min(tau, dl * 0.2)
+        except Exception:
+            pass
+
+    tau = int(np.clip(tau, min_tau_ms, max_tau_ms))
+
+    if jitter > 0:
+        tau = int(tau * random.uniform(1 - jitter, 1 + jitter))
+        tau = int(np.clip(tau, min_tau_ms, max_tau_ms))
+
+    return tau

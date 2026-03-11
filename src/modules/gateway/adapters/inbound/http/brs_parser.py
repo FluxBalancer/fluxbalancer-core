@@ -62,7 +62,6 @@ class BRSParser:
         completion_k = cls._parse_completion_k(headers)
 
         replications_adaptive = cls._parse_replications_adaptive(headers)
-        logging.Logger("123").info(replications_adaptive)
 
         return BRSRequest(
             service=service,

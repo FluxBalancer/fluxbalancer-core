@@ -16,7 +16,7 @@ class ReplicationPolicy:
         max_replicas: Верхняя граница.
     """
 
-    default_replicas: int = 3
+    default_replicas: int = 5
     max_replicas: int = 10
 
     def resolve_count(

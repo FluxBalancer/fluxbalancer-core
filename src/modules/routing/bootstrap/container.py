@@ -185,7 +185,7 @@ class RoutingModule:
             policy=self.replication_policy,
             strategy_registry=self.replication_strategy_registry,
             metrics_repository=self.metrics_repo,
-            config=PlannerConfig(lambda_cost=1.0),
+            config=PlannerConfig(),
         )
 
         self.replication_runner = None

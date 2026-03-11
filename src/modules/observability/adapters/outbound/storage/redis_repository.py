@@ -249,7 +249,6 @@ class RedisMetricsRepository(MetricsRepository):
             mem_util=float(data["mem_util"]),
             net_in_bytes=int(data["net_in_bytes"]),
             net_out_bytes=int(data["net_out_bytes"]),
-            latency_ms=float(data.get("latency_ms", 0.0)),
         )
 
         return await self._with_latency(metrics)
@@ -343,3 +342,7 @@ class RedisMetricsRepository(MetricsRepository):
             await pipe.delete(self._k_nodes())
 
             await pipe.execute()
+
+    async def get_latency_samples(self, node_id: str) -> list[float]:
+        values = await self.redis.lrange(self._k_latency(node_id), 0, -1)
+        return [float(v) for v in values]

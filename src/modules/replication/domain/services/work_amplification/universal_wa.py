@@ -27,18 +27,18 @@ class UniversalWAEstimator(WAEstimator):
 
         # если есть эмпирические данные — считаем S(t) = P(T>t) = 1 - F(t)
         samples = [x for x in self.latency_samples_ms if math.isfinite(x) and x >= 0]
-        if samples:
-            # эмпирическая CDF:
-            # F(t) = (время наблюдений <= t) / N
-            samples_sorted = sorted(samples)
-            idx = bisect.bisect_right(samples_sorted, delay_ms)
-            F = idx / len(samples_sorted)
+        if not samples:
+            # fallback: экспоненциальная модель
+            # P(T > t) = exp(-t / μ)
+            mu = max(float(prev_finish_hat_ms), 1e-6)
+            return math.exp(-float(delay_ms) / mu)
 
-            # survival-функция
-            S = 1.0 - F
-            return max(0.0, min(1.0, S))
+        # эмпирическая CDF:
+        # F(t) = (время наблюдений <= t) / N
+        samples_sorted = sorted(samples)
+        idx = bisect.bisect_right(samples_sorted, delay_ms)
+        F = idx / len(samples_sorted)
 
-        # fallback: экспоненциальная модель
-        # P(T > t) = exp(-t / μ)
-        mu = max(float(prev_finish_hat_ms), 1e-6)
-        return math.exp(-float(delay_ms) / mu)
+        # survival-функция
+        S = 1.0 - F
+        return max(0.0, min(1.0, S))

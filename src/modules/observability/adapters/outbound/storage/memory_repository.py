@@ -76,3 +76,10 @@ class InMemoryMetricsRepository(MetricsRepository):
         """
         with self._lock:
             self._latency[node_id].append(latency_ms)
+
+    async def get_latency_samples(self, node_id: str) -> list[float]:
+        with self._lock:
+            window = self._latency.get(node_id)
+            if not window:
+                return []
+            return list(window)

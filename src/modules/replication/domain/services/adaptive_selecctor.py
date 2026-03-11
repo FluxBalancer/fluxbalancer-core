@@ -13,7 +13,7 @@ def adaptive_selector_replicas(
     if delays_ms is None:
         delays_ms = []
 
-    r_max = min(r_max, len(latency_hat_ms), len(delays_ms))
+    r_max = min(r_max, len(latency_hat_ms))
     best_r = 1
     prev = latency_hat_ms[0]
 
