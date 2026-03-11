@@ -3,7 +3,7 @@ import logging
 import time
 from dataclasses import dataclass
 
-from aiohttp import ClientSession
+from aiohttp import ClientSession, ServerDisconnectedError, ClientTimeout
 from starlette.responses import Response
 
 from modules.gateway.adapters.inbound.http.brs_parser import BRSParser
@@ -71,6 +71,8 @@ class ProxyRequestUseCase:
         target_url = f"http://{host}:{port}{request.url.path}"
 
         start = time.perf_counter()
+
+        timeout = ClientTimeout(total=brs.deadline_ms / 1000)
         try:
             async with self.client.request(
                 request.method,
@@ -78,6 +80,7 @@ class ProxyRequestUseCase:
                 params=request.query_params,
                 headers=dict(request.headers),
                 data=await request.body(),
+                timeout=timeout
             ) as resp:
                 body = await resp.read()
                 latency_ms = (time.perf_counter() - start) * 1000
@@ -90,7 +93,16 @@ class ProxyRequestUseCase:
                     status=resp.status,
                     headers=dict(resp.headers),
                 )
-        except asyncio.TimeoutError as e:
+        except asyncio.TimeoutError:
+            return ProxyResult(
+                socket=f"{host}:{port}",
+                body=b"",
+                status=504,
+                headers={},
+            )
+        except Exception as e:
+            print(e)
+            logger.warning(e)
             return ProxyResult(
                 socket=f"{host}:{port}",
                 body=b"",

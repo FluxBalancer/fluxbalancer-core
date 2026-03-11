@@ -5,13 +5,13 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
 
-from modules.gateway.application.use_cases.proxy_request import ProxyRequestUseCase
+from modules.gateway.application.use_cases.proxy_request import ProxyRequestUseCase, ProxyResult
 
 logger = logging.getLogger("proxy")
 
 
 class ProxyMiddleware(BaseHTTPMiddleware):
-    INTERNAL_PATHS = {"/stats", "/docs", "/openapi.json", "/redoc"}
+    INTERNAL_PATHS = {"/stats", "/docs", "/openapi.json", "/redoc", "/clear"}
 
     def __init__(self, app):
         super().__init__(app)
@@ -27,7 +27,7 @@ class ProxyMiddleware(BaseHTTPMiddleware):
             return JSONResponse({"detail": "proxy not ready"}, status_code=503)
 
         try:
-            result = await proxy_use_case.execute(request)
+            result: ProxyResult = await proxy_use_case.execute(request)
         except Exception as e:
             traceback.print_exc()
             logger.exception("proxy failed")

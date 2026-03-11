@@ -21,7 +21,7 @@ class ChooseNodeRouter:
             data = metrics_agg_repo.get_averages()
             return JSONResponse(data)
 
-        @self.router.get("/clear")
+        @self.router.post("/clear")
         async def clear():
             """Сводные метрики по задержкам и ресурсам."""
             await metrics_repo.clear()
