@@ -144,7 +144,7 @@ def compute_tau_ms(
         latency_samples_ms: list[float],
         default_tau_ms: int = 80,
         min_tau_ms: int = 20,
-        max_tau_ms: int = 5000,
+        max_tau_ms: int = 10000,
         percentile: float = 80,
         jitter: float = 0.10,
 ) -> int:
