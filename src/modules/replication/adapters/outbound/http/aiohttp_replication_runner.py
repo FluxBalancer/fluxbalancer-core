@@ -120,9 +120,14 @@ class AiohttpReplicationRunner(ReplicationRunner):
                             p.cancel()
 
                         await asyncio.gather(*pending, return_exceptions=True)
-                        await self.latency_recorder.record(
-                            node_id=winner.node_id, latency_ms=winner.latency_ms
-                        )
+                        for reply in completion_strategy.replies:
+                            try:
+                                await self.latency_recorder.record(
+                                    node_id=reply.node_id,
+                                    latency_ms=reply.latency_ms,
+                                )
+                            except Exception:
+                                pass
 
                         return ExecutionResult(
                             node_id=winner.node_id,
@@ -140,6 +145,15 @@ class AiohttpReplicationRunner(ReplicationRunner):
                 f"Replies collected: {completion_strategy.replies}"
             )
             if completion_strategy.replies:
+                for reply in completion_strategy.replies:
+                    try:
+                        await self.latency_recorder.record(
+                            node_id=reply.node_id,
+                            latency_ms=reply.latency_ms,
+                        )
+                    except Exception:
+                        pass
+
                 best = min(
                     completion_strategy.replies,
                     key=lambda r: r.latency_ms

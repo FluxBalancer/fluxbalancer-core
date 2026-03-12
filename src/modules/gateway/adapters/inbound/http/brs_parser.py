@@ -30,7 +30,7 @@ class BRSParser:
       - X-Replications-Adaptive (bool, опционален)
     """
 
-    DEFAULT_REPLICATIONS = 3
+    DEFAULT_REPLICATIONS = 5
 
     @classmethod
     def parse(cls, request: Request) -> BRSRequest:

@@ -11,13 +11,12 @@ def hedged_requests(
     r_eff = min(replication_max_count, max_replicas, len(ranked))
     targets: list[ReplicationTarget] = []
     for i, (nid, h, p) in enumerate(ranked[:r_eff]):
-        delay = 0 if i == 0 else int(time_delta_ms)
         targets.append(
             ReplicationTarget(
                 node_id=nid,
                 host=h,
                 port=p,
-                delay_ms=delay
+                delay_ms=i * int(time_delta_ms)
             )
         )
     return ReplicationPlan(targets=targets)

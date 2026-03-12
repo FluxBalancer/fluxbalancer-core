@@ -24,12 +24,11 @@ from modules.replication.domain.services.work_amplification.universal_wa import 
 from src.modules.routing.application.usecase.choose_node import ChooseNodeUseCase
 
 
-# TODO: extract adaptive and lambda to BRS
 @dataclass(slots=True)
 class PlannerConfig:
     """Конфигурация планировщика репликации."""
 
-    lambda_cost: float = 0.5  # цена WA (под SLA)
+    lambda_cost: float = 0.3  # цена WA (под SLA)
 
 
 class ReplicationPlanner:
@@ -95,18 +94,19 @@ class ReplicationPlanner:
         ranked_base: list[tuple[str, str, int]] = ranked[:base_replication_count]
 
         latency_hat: list[float] = []
-        samples: list[float] = []
+        samples_per_node: list[list[float]] = []
 
         for node_id, _, _ in ranked_base:
             predicted: float = await self.predictor.predict(node_id)
             latency_hat.append(predicted)
 
             node_samples = await self.metrics_repository.get_latency_samples(node_id)
-            samples.extend(node_samples)
+            samples_per_node.append(node_samples)
 
         tau_ms: int | None = None
         if isinstance(strategy, HedgedReplication):
-            tau_ms = compute_tau_ms(brs=brs, latency_samples_ms=samples)
+            merged = [x for node in samples_per_node for x in node]
+            tau_ms = compute_tau_ms(brs=brs, latency_samples_ms=merged)
 
         best_replication_count: int = base_replication_count
 
@@ -114,7 +114,9 @@ class ReplicationPlanner:
             selector = AdaptiveReplicationSelector(
                 lambda_cost=self.config.lambda_cost,
                 wa_estimator=UniversalWAEstimator(
-                    latency_samples_ms=samples
+                    latency_samples_ms=[
+                        x for node in samples_per_node for x in node
+                    ]
                 ),
             )
 
@@ -124,7 +126,7 @@ class ReplicationPlanner:
             delays_ms: list[int] = [t.delay_ms for t in draft_plan.targets]
 
             best_replication_count = selector.choose_r(
-                latency_hat, r_max=base_replication_count, delays_ms=delays_ms
+                samples_per_node, r_max=base_replication_count, delays_ms=delays_ms
             )
 
         # ограничиваем ranked списком best_replication_count (для fixed), но hedged/speculative сами решат delay
@@ -143,7 +145,7 @@ def compute_tau_ms(
         default_tau_ms: int = 80,
         min_tau_ms: int = 20,
         max_tau_ms: int = 5000,
-        percentile: float = 50,
+        percentile: float = 65,
         jitter: float = 0.10,
 ) -> int:
     """
