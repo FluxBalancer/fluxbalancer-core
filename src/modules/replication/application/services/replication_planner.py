@@ -28,7 +28,7 @@ from src.modules.routing.application.usecase.choose_node import ChooseNodeUseCas
 class PlannerConfig:
     """Конфигурация планировщика репликации."""
 
-    lambda_cost: float = 0.3  # цена WA (под SLA)
+    lambda_cost: float = 0.125  # цена WA (под SLA)
 
 
 class ReplicationPlanner:
@@ -145,7 +145,7 @@ def compute_tau_ms(
         default_tau_ms: int = 80,
         min_tau_ms: int = 20,
         max_tau_ms: int = 5000,
-        percentile: float = 65,
+        percentile: float = 80,
         jitter: float = 0.10,
 ) -> int:
     """
