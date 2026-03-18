@@ -1,6 +1,8 @@
 import numpy as np
 
-from src.modules.observability.application.ports.metrics_repository import MetricsRepository
+from src.modules.observability.application.ports.metrics_repository import (
+    MetricsRepository,
+)
 
 
 class LatencyPredictor:
@@ -25,6 +27,4 @@ class LatencyPredictor:
         arr = np.asarray(samples)
 
         p95 = np.percentile(arr, 95)
-        mean = arr.mean()
-
-        return float(0.7 * p95 + 0.3 * mean)
+        return p95

@@ -5,7 +5,10 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response, JSONResponse
 
-from modules.gateway.application.use_cases.proxy_request import ProxyRequestUseCase, ProxyResult
+from modules.gateway.application.use_cases.proxy_request import (
+    ProxyRequestUseCase,
+    ProxyResult,
+)
 
 logger = logging.getLogger("proxy")
 
@@ -28,11 +31,11 @@ class ProxyMiddleware(BaseHTTPMiddleware):
 
         try:
             result: ProxyResult = await proxy_use_case.execute(request)
-        except Exception as e:
+        except Exception:
             traceback.print_exc()
             logger.exception("proxy failed")
             return JSONResponse(
-                {"detail": f"proxy failed"},
+                {"detail": "proxy failed"},
                 status_code=503,
             )
 

@@ -9,3 +9,4 @@ class ExecutionResult:
     body: bytes
     headers: Mapping[str, str] | None = None
     latency_ms: float = 0.0
+    started_nodes: list[str] | None = None

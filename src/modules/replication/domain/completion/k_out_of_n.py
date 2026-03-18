@@ -2,13 +2,7 @@ from .base import CompletionPolicy, ReplicaReply
 
 
 class KOutOfNPolicy(CompletionPolicy):
-    """Схема k-out-of-n.
-
-    Завершает выполнение после получения k валидных ответов.
-
-    Args:
-        k: Минимальное число валидных ответов.
-    """
+    """Завершает выполнение после получения k валидных ответов."""
 
     def __init__(self, k: int) -> None:
         if k <= 0:
@@ -17,13 +11,15 @@ class KOutOfNPolicy(CompletionPolicy):
         self.replies: list[ReplicaReply] = []
 
     def push(self, reply: ReplicaReply) -> None:
-        if reply.ok:
-            self.replies.append(reply)
+        self.replies.append(reply)
 
     def is_done(self) -> bool:
-        return len(self.replies) >= self.k
+        valid_count = sum(1 for reply in self.replies if reply.ok)
+        return valid_count >= self.k
 
     def choose(self) -> ReplicaReply:
-        if not self.is_done():
+        valid = [reply for reply in self.replies if reply.ok]
+        if len(valid) < self.k:
             raise RuntimeError("KOutOfNPolicy: недостаточно валидных ответов")
-        return min(self.replies, key=lambda r: r.latency_ms)
+
+        return min(valid, key=lambda r: r.latency_ms)

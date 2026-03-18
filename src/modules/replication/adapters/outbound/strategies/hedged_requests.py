@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Callable, Awaitable
 
 from modules.replication.adapters.outbound.strategies.base import ReplicationStrategy
 from modules.replication.domain.model.replication_plan import ReplicationPlan
@@ -26,6 +25,7 @@ class HedgedReplication(ReplicationStrategy):
         *,
         max_replicas: int,
         tau_ms: int | None = None,
+        latency_samples_per_node: list[list[float]] | None = None,
     ) -> ReplicationPlan:
         effective_tau = int(tau_ms) if tau_ms is not None else int(self.tau_ms)
         return hedged_requests(
@@ -33,4 +33,5 @@ class HedgedReplication(ReplicationStrategy):
             time_delta_ms=effective_tau,
             ranked=ranked,
             max_replicas=max_replicas,
+            latency_samples_per_node=latency_samples_per_node,
         )

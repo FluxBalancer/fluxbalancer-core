@@ -39,5 +39,5 @@ class AdaptiveReplicationSelector:
             lambda_cost=self.lambda_cost,
             wa_estimator=self.wa_estimator,
             delays_ms=delays_ms,
-            samples_per_node=samples_per_node
+            samples_per_node=samples_per_node,
         )

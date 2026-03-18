@@ -16,6 +16,7 @@ class ReplicaReply:
     """
 
     node_id: str
+    socket: str
     ok: bool
     value: str
     raw_body: bytes

@@ -83,3 +83,8 @@ class InMemoryMetricsRepository(MetricsRepository):
             if not window:
                 return []
             return list(window)
+
+    async def clear(self) -> None:
+        with self._lock:
+            self._history.clear()
+            self._latency.clear()

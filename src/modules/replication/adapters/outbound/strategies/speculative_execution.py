@@ -31,10 +31,13 @@ class SpeculativeReplication(ReplicationStrategy):
         *,
         max_replicas: int,
         tau_ms: int | None = None,
+        latency_samples_per_node: list[list[float]] | None = None,
     ) -> ReplicationPlan:
         return speculative_execution(
             replication_max_count=self.r_max,
             threshold_ms=self.threshold_ms,
             ranked=ranked,
             max_replicas=max_replicas,
+            tau_ms=tau_ms,
+            latency_samples_per_node=latency_samples_per_node,
         )

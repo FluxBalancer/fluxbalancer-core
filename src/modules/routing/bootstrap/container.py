@@ -1,5 +1,6 @@
 from aiohttp import ClientSession
 
+from config.settings import settings, MetricsBackend
 from core.application.ports.strategy_provider import (
     StrategyProvider,
 )
@@ -63,7 +64,6 @@ from src.modules.routing.application.ports.choose_node_port import (
     ChooseNodePort,
 )
 from src.modules.routing.application.usecase.choose_node import ChooseNodeUseCase
-from config.settings import settings, MetricsBackend
 
 
 class RoutingModule:

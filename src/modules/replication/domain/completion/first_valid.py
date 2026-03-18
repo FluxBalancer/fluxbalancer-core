@@ -13,8 +13,8 @@ class FirstValidPolicy(CompletionPolicy):
         self._winner: ReplicaReply | None = None
 
     def push(self, reply: ReplicaReply) -> None:
+        self.replies.append(reply)
         if self._winner is None and reply.ok:
-            self.replies = [reply]
             self._winner = reply
 
     def is_done(self) -> bool:

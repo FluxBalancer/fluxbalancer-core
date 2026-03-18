@@ -11,7 +11,7 @@ class ChooseNodeRouter:
     def __init__(
         self,
         metrics_agg_repo: MetricsAggregationRepository,
-        metrics_repo: MetricsRepository
+        metrics_repo: MetricsRepository,
     ):
         self.router = APIRouter()
 

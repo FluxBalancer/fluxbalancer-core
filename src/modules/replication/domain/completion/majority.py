@@ -2,13 +2,21 @@ from .base import CompletionPolicy, ReplicaReply
 
 
 class MajorityPolicy(CompletionPolicy):
-    """Голосование большинством среди полученных ответов.
+    """
+    Настоящее majority:
+    нужно получить большинство от ОБЩЕГО числа запущенных реплик.
 
-    Завершает выполнение при достижении:
-        ceil(n / 2) + 1
+    Для n_total:
+        quorum = floor(n_total / 2) + 1
     """
 
-    def __init__(self) -> None:
+    def __init__(self, expected_n: int) -> None:
+        if expected_n <= 0:
+            raise ValueError("expected_n должно быть > 0")
+
+        self.expected_n = expected_n
+        self.required = (expected_n // 2) + 1
+
         self.replies: list[ReplicaReply] = []
         self._counts: dict[str, int] = {}
 
@@ -19,22 +27,17 @@ class MajorityPolicy(CompletionPolicy):
             self._counts[reply.value] = self._counts.get(reply.value, 0) + 1
 
     def is_done(self) -> bool:
-        n = len(self.replies)
-        if n == 0:
-            return False
-
-        q_min = (n // 2) + 1
-        return any(c >= q_min for c in self._counts.values())
+        return any(count >= self.required for count in self._counts.values())
 
     def choose(self) -> ReplicaReply:
         if not self.is_done():
             raise RuntimeError("MajorityPolicy: большинство не достигнуто")
 
-        n = len(self.replies)
-        q_min = (n // 2) + 1
-
-        winners = {v for v, c in self._counts.items() if c >= q_min}
-
-        candidates = [r for r in self.replies if r.ok and r.value in winners]
+        winners = {
+            value for value, count in self._counts.items() if count >= self.required
+        }
+        candidates = [
+            reply for reply in self.replies if reply.ok and reply.value in winners
+        ]
 
         return min(candidates, key=lambda r: r.latency_ms)

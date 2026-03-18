@@ -8,10 +8,10 @@ def airm(
     x_matrix: Matrix,
     w: Vector,
     *,
-    n_iter: int = 1000,
-    alpha_scale: float = 5,
+    n_iter: int = 2000,
+    alpha_scale: float = 20,
     benefit_mask=None,
-    random_state: int | None = None,
+    random_state: int | None = 42,
 ) -> Vector:
     """Выбор лучшей альтернативы методом AIRM (Aggregated Indices Randomization Method).
 

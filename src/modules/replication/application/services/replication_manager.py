@@ -28,17 +28,17 @@ class ReplicationManager:
     """
 
     def __init__(
-            self,
-            planner: ReplicationPlanner,
-            executor: ReplicationRunner,
+        self,
+        planner: ReplicationPlanner,
+        executor: ReplicationRunner,
     ):
         self.planner = planner
         self.runner = executor
 
     async def execute(
-            self,
-            request: Request,
-            brs: BRSRequest,
+        self,
+        request: Request,
+        brs: BRSRequest,
     ) -> Response:
         """Выполняет репликацию запроса.
 
@@ -60,7 +60,6 @@ class ReplicationManager:
         )
 
         deadline_at: float = time.perf_counter() + (brs.deadline_ms / 1000.0)
-        sockets = ", ".join([f"{target.host}:{target.port}" for target in plan.targets])
 
         result: ExecutionResult = await self.runner.execute(
             cmd=cmd,
@@ -70,6 +69,7 @@ class ReplicationManager:
             ),
             deadline_at=deadline_at,
         )
+        sockets = ", ".join([target_socket for target_socket in result.started_nodes])
 
         return (
             Response(

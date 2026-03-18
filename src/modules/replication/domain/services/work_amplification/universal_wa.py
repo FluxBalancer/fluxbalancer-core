@@ -19,26 +19,41 @@ class UniversalWAEstimator(WAEstimator):
     Мы оцениваем S(t) либо эмпирически по наблюдениям, либо через экспоненциальную модель.
     """
 
-    latency_samples_ms: list[float]
+    latency_samples_per_node: list[list[float]]
 
-    def delta_wa(self, *, delay_ms: float, prev_finish_hat_ms: float) -> float:
+    def delta_wa(
+        self,
+        *,
+        delay_ms: float,
+        prev_finish_hat_ms: float,
+        active_prefix: int,
+        delays_ms: list[int],
+    ) -> float:
         if delay_ms <= 0:
-            return 1.0  # старт сразу => почти наверняка "запустится"
+            return 1.0
 
-        # если есть эмпирические данные — считаем S(t) = P(T>t) = 1 - F(t)
-        samples = [x for x in self.latency_samples_ms if math.isfinite(x) and x >= 0]
+        survival_prod = 1.0
+
+        for i in range(active_prefix):
+            node_samples = self.latency_samples_per_node[i]
+            effective_delay = delay_ms - delays_ms[i]
+            if effective_delay <= 0:
+                continue
+
+            S = self._survival(node_samples, effective_delay, prev_finish_hat_ms)
+            survival_prod *= S
+
+        return survival_prod
+
+    def _survival(self, samples: list[float], t: float, fallback_mu: float) -> float:
+        samples = [x for x in samples if math.isfinite(x) and x >= 0]
+
         if not samples:
             # fallback: экспоненциальная модель
-            # P(T > t) = exp(-t / μ)
-            mu = max(float(prev_finish_hat_ms), 1e-6)
-            return math.exp(-float(delay_ms) / mu)
+            mu = max(float(fallback_mu), 1e-6)
+            return math.exp(-t / mu)
 
-        # эмпирическая CDF:
-        # F(t) = (время наблюдений <= t) / N
         samples_sorted = sorted(samples)
-        idx = bisect.bisect_right(samples_sorted, delay_ms)
+        idx = bisect.bisect_right(samples_sorted, t)
         F = idx / len(samples_sorted)
-
-        # survival-функция
-        S = 1.0 - F
-        return max(0.0, min(1.0, S))
+        return max(0.0, min(1.0, 1.0 - F))

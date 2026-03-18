@@ -1,5 +1,3 @@
-import logging
-
 from starlette.datastructures import Headers
 from starlette.requests import Request
 

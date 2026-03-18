@@ -3,8 +3,7 @@ import logging
 import time
 from dataclasses import dataclass
 
-from aiohttp import ClientSession, ServerDisconnectedError, ClientTimeout
-from starlette.responses import Response
+from aiohttp import ClientSession, ClientTimeout
 
 from modules.gateway.adapters.inbound.http.brs_parser import BRSParser
 from modules.gateway.application.dto.brs import BRSRequest
@@ -67,9 +66,11 @@ class ProxyRequestUseCase:
             )
 
         node_id, host, port = await self.choose_node.execute(brs)
-        logger.info(f"request without replication to {host}:{port} on node={node_id}")
-        target_url = f"http://{host}:{port}{request.url.path}"
+        socket = f"{host}:{port}"
 
+        logger.info("request without replication to %s on node=%s", socket, node_id)
+
+        target_url = f"http://{host}:{port}{request.url.path}"
         start = time.perf_counter()
 
         timeout = ClientTimeout(total=brs.deadline_ms / 1000)
@@ -80,32 +81,41 @@ class ProxyRequestUseCase:
                 params=request.query_params,
                 headers=dict(request.headers),
                 data=await request.body(),
-                timeout=timeout
+                timeout=timeout,
             ) as resp:
                 body = await resp.read()
-                latency_ms = (time.perf_counter() - start) * 1000
-
-                await self.metrics_repo.add_latency(node_id, latency_ms)
+                await self._record_latency(node_id, start, True)
 
                 return ProxyResult(
-                    socket=f"{host}:{port}",
+                    socket=socket,
                     body=body,
                     status=resp.status,
                     headers=dict(resp.headers),
                 )
         except asyncio.TimeoutError:
+            await self._record_latency(node_id, start, False)
+
             return ProxyResult(
-                socket=f"{host}:{port}",
+                socket=socket,
                 body=b"",
                 status=504,
                 headers={},
             )
         except Exception as e:
-            print(e)
-            logger.warning(e)
+            await self._record_latency(node_id, start, False)
+            logger.exception("proxy request failed: %s", e)
+
             return ProxyResult(
-                socket=f"{host}:{port}",
+                socket=socket,
                 body=b"",
                 status=500,
                 headers={},
             )
+
+    async def _record_latency(self, node_id: str, start: float, success: bool):
+        latency_ms = (time.perf_counter() - start) * 1000
+        if success:
+            latency = latency_ms
+        else:
+            latency = latency_ms * 1.5
+        await self.metrics_repo.add_latency(node_id, latency)

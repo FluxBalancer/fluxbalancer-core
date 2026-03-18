@@ -4,11 +4,11 @@ from modules.replication.domain.policies.wa_estimator import WAEstimator
 
 
 def _estimate_tail_latency(
-        samples_per_node: list[list[float]],
-        delays_ms: list[int],
-        *,
-        q: float = 0.99,
-        mc_samples: int = 600,
+    samples_per_node: list[list[float]],
+    delays_ms: list[int],
+    *,
+    q: float = 0.99,
+    mc_samples: int = 1000,
 ) -> float:
     """
     Оценивает q-квантиль времени завершения:
@@ -30,8 +30,7 @@ def _estimate_tail_latency(
             if not samples:
                 continue
 
-            arr = np.asarray(samples)
-            t = float(arr[np.random.randint(len(arr))])
+            t = samples[np.random.randint(len(samples))]
             delay = delays_ms[i] if i < len(delays_ms) else 0
 
             times.append(t + delay)
@@ -43,11 +42,11 @@ def _estimate_tail_latency(
 
 
 def adaptive_selector_replicas(
-        r_max: int,
-        lambda_cost: float,
-        wa_estimator: WAEstimator,
-        delays_ms: list[int] | None,
-        samples_per_node: list[list[float]],
+    r_max: int,
+    lambda_cost: float,
+    wa_estimator: WAEstimator,
+    delays_ms: list[int] | None,
+    samples_per_node: list[list[float]],
 ) -> int:
     """
     Выбор числа реплик через оценку tail latency.
@@ -78,6 +77,8 @@ def adaptive_selector_replicas(
         delta_WA = wa_estimator.delta_wa(
             delay_ms=delay_r,
             prev_finish_hat_ms=prev_tail,
+            active_prefix=r - 1,
+            delays_ms=delays_ms,
         )
 
         if delta_L >= lambda_cost * delta_WA:

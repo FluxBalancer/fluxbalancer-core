@@ -17,7 +17,7 @@ class ReplicationPolicy:
     """
 
     default_replicas: int = 3
-    max_replicas: int = 10
+    max_replicas: int = 4
 
     def resolve_count(
         self, replication_decision: ReplicationDecision, available_nodes: int

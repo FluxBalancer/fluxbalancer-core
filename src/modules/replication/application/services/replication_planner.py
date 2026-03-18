@@ -6,12 +6,10 @@ import numpy as np
 from core.application.ports.strategy_provider import StrategyProvider
 from modules.gateway.application.dto.brs import BRSRequest
 from modules.observability.application.ports.metrics_repository import MetricsRepository
-from modules.observability.application.services.latency_predictor import LatencyPredictor
-from modules.observability.domain.node_metrics import NodeMetrics
-from modules.replication.adapters.outbound.strategies.base import ReplicationStrategy
-from modules.replication.adapters.outbound.strategies.hedged_requests import (
-    HedgedReplication,
+from modules.observability.application.services.latency_predictor import (
+    LatencyPredictor,
 )
+from modules.replication.adapters.outbound.strategies.base import ReplicationStrategy
 from modules.replication.domain.model.replication_plan import ReplicationPlan
 from modules.replication.domain.policies.adaptive_replication_selector_policy import (
     AdaptiveReplicationSelector,
@@ -28,7 +26,8 @@ from src.modules.routing.application.usecase.choose_node import ChooseNodeUseCas
 class PlannerConfig:
     """Конфигурация планировщика репликации."""
 
-    lambda_cost: float = 0.125  # цена WA (под SLA)
+    lambda_cost: float = 0.1
+    min_samples_for_adaptive: int = 5
 
 
 class ReplicationPlanner:
@@ -51,13 +50,13 @@ class ReplicationPlanner:
     """
 
     def __init__(
-            self,
-            chooser: ChooseNodeUseCase,
-            policy: ReplicationPolicy,
-            strategy_registry: StrategyProvider[ReplicationStrategy],
-            metrics_repository: MetricsRepository,
-            *,
-            config: PlannerConfig = PlannerConfig(),
+        self,
+        chooser: ChooseNodeUseCase,
+        policy: ReplicationPolicy,
+        strategy_registry: StrategyProvider[ReplicationStrategy],
+        metrics_repository: MetricsRepository,
+        *,
+        config: PlannerConfig = PlannerConfig(),
     ):
         self.metrics_repository = metrics_repository
         self.predictor = LatencyPredictor(metrics_repository)
@@ -93,30 +92,40 @@ class ReplicationPlanner:
         )
         ranked_base: list[tuple[str, str, int]] = ranked[:base_replication_count]
 
-        latency_hat: list[float] = []
-        samples_per_node: list[list[float]] = []
-
+        latency_samples_per_node: list[list[float]] = []
         for node_id, _, _ in ranked_base:
-            predicted: float = await self.predictor.predict(node_id)
-            latency_hat.append(predicted)
-
             node_samples = await self.metrics_repository.get_latency_samples(node_id)
-            samples_per_node.append(node_samples)
+            node_samples = [
+                float(sample)
+                for sample in node_samples
+                if np.isfinite(sample) and sample > 0
+            ]
+            latency_samples_per_node.append(node_samples)
 
-        tau_ms: int | None = None
-        if isinstance(strategy, HedgedReplication):
-            merged = [x for node in samples_per_node for x in node]
-            tau_ms = compute_tau_ms(brs=brs, latency_samples_ms=merged)
+        primary_samples = (
+            latency_samples_per_node[0] if latency_samples_per_node else []
+        )
+        tau_ms = compute_tau_ms(
+            brs=brs,
+            latency_samples_ms=primary_samples,
+        )
 
         best_replication_count: int = base_replication_count
 
-        if brs.replications_adaptive and base_replication_count > 1:
+        enough_history_for_adaptive = (
+            brs.replications_adaptive is True
+            and base_replication_count > 1
+            and len(latency_samples_per_node) >= 2
+            and all(
+                len(samples) >= self.config.min_samples_for_adaptive
+                for samples in latency_samples_per_node[:base_replication_count]
+            )
+        )
+        if enough_history_for_adaptive:
             selector = AdaptiveReplicationSelector(
                 lambda_cost=self.config.lambda_cost,
                 wa_estimator=UniversalWAEstimator(
-                    latency_samples_ms=[
-                        x for node in samples_per_node for x in node
-                    ]
+                    latency_samples_per_node=latency_samples_per_node
                 ),
             )
 
@@ -126,71 +135,61 @@ class ReplicationPlanner:
             delays_ms: list[int] = [t.delay_ms for t in draft_plan.targets]
 
             best_replication_count = selector.choose_r(
-                samples_per_node, r_max=base_replication_count, delays_ms=delays_ms
+                latency_samples_per_node,
+                r_max=base_replication_count,
+                delays_ms=delays_ms,
             )
 
         # ограничиваем ranked списком best_replication_count (для fixed), но hedged/speculative сами решат delay
         ranked_cut: list[tuple[str, str, int]] = ranked[:best_replication_count]
         plan: ReplicationPlan = await strategy.build(
-            ranked_cut, max_replicas=best_replication_count, tau_ms=tau_ms
+            ranked_cut,
+            max_replicas=best_replication_count,
+            tau_ms=tau_ms,
+            latency_samples_per_node=latency_samples_per_node,
         )
         plan.r_eff = best_replication_count
         return plan
 
 
 def compute_tau_ms(
-        brs: BRSRequest,
-        *,
-        latency_samples_ms: list[float],
-        default_tau_ms: int = 80,
-        min_tau_ms: int = 20,
-        max_tau_ms: int = 10000,
-        percentile: float = 80,
-        jitter: float = 0.10,
+    brs: BRSRequest,
+    *,
+    latency_samples_ms: list[float],
+    default_tau_ms: int = 220,
+    warmup_min_samples: int = 8,
+    jitter: float = 0.05,
 ) -> int:
-    """
-    Вычисляет задержку запуска дополнительной реплики (τ).
-
-    Логика:
-    - τ ≈ median latency (p50)
-    - если мало данных → fallback на default_tau_ms
-    - τ ограничивается долей дедлайна
-    - добавляется небольшой jitter для предотвращения синхронизации
-
-    Args:
-        brs:
-        latency_samples_ms: наблюдения latency
-        default_tau_ms:
-        min_tau_ms:
-        max_tau_ms:
-        percentile: используемый процентиль (обычно 50–60)
-        jitter:
-    """
-
     samples = np.asarray(latency_samples_ms, dtype=float)
-
     samples = samples[np.isfinite(samples)]
     samples = samples[samples > 0]
 
     if samples.size == 0:
-        tau = default_tau_ms
+        tau = float(default_tau_ms)
+
+    elif samples.size < warmup_min_samples:
+        p50 = float(np.percentile(samples, 50))
+        tau = 0.5 * p50
+
     else:
-        tau = float(np.percentile(samples, percentile))
+        p50 = float(np.percentile(samples, 50))
+        p95 = float(np.percentile(samples, 95))
 
-    # ограничение по дедлайну
+        tail_ratio = (p95 - p50) / max(p50, 1.0)
+
+        if tail_ratio > 1.0:
+            tau = 0.4 * p50
+        elif tail_ratio > 0.5:
+            tau = 0.6 * p50
+        else:
+            tau = 0.8 * p50
+
+    tau = max(tau, 5.0)
+
     if brs.deadline_ms:
-        try:
-            dl = float(brs.deadline_ms)
-
-            if dl > 0:
-                tau = min(tau, dl * 0.2)
-        except Exception:
-            pass
-
-    tau = int(np.clip(tau, min_tau_ms, max_tau_ms))
+        tau = min(tau, 0.4 * brs.deadline_ms)
 
     if jitter > 0:
-        tau = int(tau * random.uniform(1 - jitter, 1 + jitter))
-        tau = int(np.clip(tau, min_tau_ms, max_tau_ms))
+        tau *= random.uniform(1.0 - jitter, 1.0 + jitter)
 
-    return tau
+    return int(max(1, round(tau)))

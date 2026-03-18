@@ -1,5 +1,4 @@
 import logging
-from dataclasses import asdict
 
 import contracts.metrics.metrics_pb2 as metrics_pb2
 import contracts.metrics.metrics_pb2_grpc as metrics_pb2_grpc

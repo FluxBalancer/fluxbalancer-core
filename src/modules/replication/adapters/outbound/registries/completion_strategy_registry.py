@@ -26,9 +26,19 @@ class CompletionStrategyRegistry(StrategyProvider[CompletionPolicy]):
     def __init__(self):
         self._map: dict[str, Callable[..., CompletionPolicy]] = {
             CompletionAlgorithmName.FIRST: lambda **_: FirstValidPolicy(),
-            CompletionAlgorithmName.MAJORITY: lambda **_: MajorityPolicy(),
-            CompletionAlgorithmName.QUORUM: lambda k=2, **_: QuorumPolicy(k),
-            CompletionAlgorithmName.K_OUT_OF_N: lambda k=2, **_: KOutOfNPolicy(k),
+            CompletionAlgorithmName.MAJORITY: (
+                lambda n_total=1, **_: MajorityPolicy(expected_n=max(1, int(n_total)))
+            ),
+            CompletionAlgorithmName.QUORUM: (
+                lambda k=None, n_total=1, **_: QuorumPolicy(
+                    quorum_size=(
+                        int(k) if k is not None else max(1, (int(n_total) // 2) + 1)
+                    )
+                )
+            ),
+            CompletionAlgorithmName.K_OUT_OF_N: (
+                lambda k=1, **_: KOutOfNPolicy(k=max(1, int(k)))
+            ),
         }
 
     def get(self, name: str | None, **kwargs) -> CompletionPolicy:

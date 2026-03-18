@@ -12,13 +12,15 @@ class ReplicationStrategy(Protocol):
         *,
         max_replicas: int,
         tau_ms: int | None = None,
+        latency_samples_per_node: list[list[float]] | None = None
     ) -> ReplicationPlan:
         """Формирует план репликации.
 
         Args:
             ranked: Отранжированные узлы (node_id, host, port) по лучшему к худшему.
             max_replicas: Верхняя граница числа реплик.
-            tau_ms
+            tau_ms:
+            latency_samples_per_node:
 
         Returns:
             ReplicationPlan.
