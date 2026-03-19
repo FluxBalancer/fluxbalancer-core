@@ -67,6 +67,9 @@ class RedisMetricsRepository(MetricsRepository):
     def _k_nodes(self) -> str:
         return f"{self.prefix}:nodes"
 
+    def _k_profiles(self, node_id: str) -> str:
+        return f"{self.prefix}:{node_id}:profiles"
+
     def _k_latest(self, node_id: str) -> str:
         """
         Формирует ключ Redis для хранения
@@ -93,18 +96,9 @@ class RedisMetricsRepository(MetricsRepository):
         """
         return f"{self.prefix}:{node_id}:history"
 
-    def _k_latency(self, node_id: str) -> str:
-        """
-        Формирует ключ Redis для хранения
-        latency-событий узла.
-
-        Args:
-            node_id: Идентификатор узла.
-
-        Returns:
-            Ключ Redis для LIST с latency-событиями.
-        """
-        return f"{self.prefix}:{node_id}:latency"
+    def _k_latency(self, node_id: str, profile: str | None = None) -> str:
+        profile_key = profile or "__all__"
+        return f"{self.prefix}:{node_id}:latency:{profile_key}"
 
     def _serialize(self, m: NodeMetrics) -> str:
         """
@@ -173,21 +167,20 @@ class RedisMetricsRepository(MetricsRepository):
                 .execute()
             )
 
-    async def add_latency(self, node_id: str, latency_ms: float) -> None:
-        """
-        Добавляет событие latency для узла.
-
-        Значение сохраняется в скользящем окне,
-        используемом для расчёта p95.
-
-        Args:
-            node_id: Идентификатор узла.
-            latency_ms: Задержка в миллисекундах.
-        """
+    async def add_latency(
+        self,
+        node_id: str,
+        latency_ms: float,
+        profile: str | None = None,
+    ) -> None:
+        latency_key = self._k_latency(node_id, profile)
         async with self.redis.pipeline(transaction=True) as pipe:
-            await pipe.lpush(self._k_latency(node_id), latency_ms).ltrim(
-                self._k_latency(node_id), 0, self.latency_window - 1
-            ).execute()
+            await (
+                pipe.lpush(latency_key, latency_ms)
+                .ltrim(latency_key, 0, self.latency_window - 1)
+                .sadd(self._k_profiles(node_id), profile or "__all__")
+                .execute()
+            )
 
     async def _latency_p95(self, node_id: str) -> float | None:
         """
@@ -337,12 +330,36 @@ class RedisMetricsRepository(MetricsRepository):
             for node_id in node_ids:
                 await pipe.delete(self._k_latest(node_id))
                 await pipe.delete(self._k_history(node_id))
-                await pipe.delete(self._k_latency(node_id))
+
+                profiles = await self.redis.smembers(self._k_profiles(node_id))
+                for profile in profiles:
+                    await pipe.delete(self._k_latency(node_id, profile))
+
+                await pipe.delete(self._k_profiles(node_id))
 
             await pipe.delete(self._k_nodes())
-
             await pipe.execute()
 
-    async def get_latency_samples(self, node_id: str) -> list[float]:
-        values = await self.redis.lrange(self._k_latency(node_id), 0, -1)
-        return [float(v) for v in values]
+    async def get_latency_samples(
+        self,
+        node_id: str,
+        profile: str | None = None,
+    ) -> list[float]:
+        if profile is not None:
+            values = await self.redis.lrange(self._k_latency(node_id, profile), 0, -1)
+            return [float(v) for v in values]
+
+        profiles = await self.redis.smembers(self._k_profiles(node_id))
+        if not profiles:
+            return []
+
+        async with self.redis.pipeline(transaction=False) as pipe:
+            for profile_name in profiles:
+                await pipe.lrange(self._k_latency(node_id, profile_name), 0, -1)
+            raw_lists = await pipe.execute()
+
+        values: list[float] = []
+        for raw in raw_lists:
+            values.extend(float(v) for v in raw)
+
+        return values

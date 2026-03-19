@@ -76,7 +76,7 @@ class BRSParser:
 
     @staticmethod
     def _parse_replications_adaptive(headers: Headers) -> bool | None:
-        value: str = headers.get("X-Replications-Adaptive", "true").lower()
+        value: str = headers.get("X-Replications-Adaptive", "false").lower()
 
         if value not in {"true", "false"}:
             return None

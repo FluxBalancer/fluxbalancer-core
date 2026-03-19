@@ -36,10 +36,8 @@ class ReplicationManager:
         self.runner = executor
 
     async def execute(
-        self,
-        request: Request,
-        brs: BRSRequest,
-    ) -> Response:
+        self, request: Request, brs: BRSRequest, request_profile: str | None = None
+    ) -> tuple[Response, str, bool]:
         """Выполняет репликацию запроса.
 
         Args:
@@ -48,8 +46,22 @@ class ReplicationManager:
 
         Returns:
             Response: Ответ первого завершённого запроса.
+            str: socket
+            bool: Имеет ли plan.targets больше 1 элемента или нет
         """
-        plan: ReplicationPlan = await self.planner.build(brs)
+        plan: ReplicationPlan = await self.planner.build(
+            brs, request_profile=request_profile
+        )
+        if len(plan.targets) <= 1:
+            return (
+                Response(
+                    content=b"",
+                    status_code=300,
+                    headers={},
+                ),
+                "",
+                False,
+            )
 
         cmd = ReplicationCommand(
             method=request.method,
@@ -57,6 +69,7 @@ class ReplicationManager:
             query=request.query_params,
             headers=request.headers,
             body=await request.body(),
+            profile=request_profile,
         )
 
         deadline_at: float = time.perf_counter() + (brs.deadline_ms / 1000.0)
@@ -78,4 +91,5 @@ class ReplicationManager:
                 headers=result.headers or {},
             ),
             sockets,
+            True,
         )

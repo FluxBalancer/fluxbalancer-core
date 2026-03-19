@@ -26,6 +26,7 @@ class HedgedReplication(ReplicationStrategy):
         max_replicas: int,
         tau_ms: int | None = None,
         latency_samples_per_node: list[list[float]] | None = None,
+        backup_max_inflight: int | None
     ) -> ReplicationPlan:
         effective_tau = int(tau_ms) if tau_ms is not None else int(self.tau_ms)
         return hedged_requests(
@@ -34,4 +35,5 @@ class HedgedReplication(ReplicationStrategy):
             ranked=ranked,
             max_replicas=max_replicas,
             latency_samples_per_node=latency_samples_per_node,
+            backup_max_inflight=backup_max_inflight,
         )

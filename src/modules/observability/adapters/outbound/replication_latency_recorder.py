@@ -8,5 +8,14 @@ class MetricsRepositoryLatencyRecorder(LatencyRecorder):
     def __init__(self, repo: MetricsRepository):
         self.repo = repo
 
-    async def record(self, node_id: str, latency_ms: float) -> None:
-        await self.repo.add_latency(node_id, latency_ms)
+    async def record(
+        self,
+        node_id: str,
+        latency_ms: float,
+        profile: str | None = None,
+    ) -> None:
+        await self.repo.add_latency(
+            node_id=node_id,
+            latency_ms=latency_ms,
+            profile=profile,
+        )

@@ -35,6 +35,7 @@ from modules.observability.adapters.outbound.storage.memory_repository import (
 from modules.observability.adapters.outbound.storage.redis_repository import (
     RedisMetricsRepository,
 )
+from modules.observability.application.services.inflight_tracker import InflightTracker
 from modules.replication.adapters.outbound.http.aiohttp_replication_runner import (
     AiohttpReplicationRunner,
 )
@@ -85,6 +86,8 @@ class RoutingModule:
         self.decision_policy: DecisionResolverPolicy
         self.choose_node_uc: ChooseNodePort
 
+        self.inflight_tracker: InflightTracker = None
+
         self.replication_policy: ReplicationPolicy
         self.replication_planner: ReplicationPlanner
         self.replication_runner: AiohttpReplicationRunner = None
@@ -102,10 +105,13 @@ class RoutingModule:
         self._init_replication_policy()
 
     async def init_async(self, client_session: ClientSession):
+        self.inflight_tracker = InflightTracker()
+
         self.replication_runner = AiohttpReplicationRunner(
             client=client_session,
             latency_recorder=self.latency_recorder,
             completion_policy_strategy=self.completion_registry,
+            inflight_tracker=self.inflight_tracker,
         )
 
         self.replication_manager = ReplicationManager(
@@ -118,6 +124,7 @@ class RoutingModule:
             replication_manager=self.replication_manager,
             metrics_repo=self.metrics_repo,
             client=client_session,
+            inflight_tracker=self.inflight_tracker,
         )
 
     def _init_repositories(self) -> None:

@@ -10,6 +10,10 @@ from modules.gateway.application.dto.brs import BRSRequest
 from modules.observability.application.ports.metrics_repository import (
     MetricsRepository,
 )
+from modules.observability.application.services.inflight_tracker import InflightTracker
+from modules.observability.application.services.request_profile import (
+    build_request_profile,
+)
 from modules.replication.application.services.replication_manager import (
     ReplicationManager,
 )
@@ -41,14 +45,20 @@ class ProxyRequestUseCase:
         replication_manager: ReplicationManager,
         metrics_repo: MetricsRepository,
         client: ClientSession,
+        inflight_tracker: InflightTracker,
     ):
         self.choose_node = choose_node
         self.replication_manager = replication_manager
         self.metrics_repo = metrics_repo
         self.client = client
+        self.inflight_tracker = inflight_tracker
 
     async def execute(self, request) -> ProxyResult:
         brs: BRSRequest = BRSParser.parse(request)
+        request_profile = build_request_profile(
+            path=request.url.path,
+            query=request.query_params,
+        )
 
         use_replication = (
             brs.replicate_all
@@ -57,15 +67,18 @@ class ProxyRequestUseCase:
         )
 
         if use_replication:
-            response, sockets = await self.replication_manager.execute(request, brs)
-            return ProxyResult(
-                socket=sockets,
-                body=response.body,
-                status=response.status_code,
-                headers=dict(response.headers),
+            response, sockets, is_used_replication = (
+                await self.replication_manager.execute(request, brs, request_profile)
             )
+            if is_used_replication:
+                return ProxyResult(
+                    socket=sockets,
+                    body=response.body,
+                    status=response.status_code,
+                    headers=dict(response.headers),
+                )
 
-        node_id, host, port = await self.choose_node.execute(brs)
+        node_id, host, port = await self.choose_node.execute(brs, request_profile)
         socket = f"{host}:{port}"
 
         logger.info("request without replication to %s on node=%s", socket, node_id)
@@ -75,26 +88,26 @@ class ProxyRequestUseCase:
 
         timeout = ClientTimeout(total=brs.deadline_ms / 1000)
         try:
-            async with self.client.request(
-                request.method,
-                target_url,
-                params=request.query_params,
-                headers=dict(request.headers),
-                data=await request.body(),
-                timeout=timeout,
-            ) as resp:
-                body = await resp.read()
-                await self._record_latency(node_id, start, True)
+            async with self.inflight_tracker.track(node_id):
+                async with self.client.request(
+                    request.method,
+                    target_url,
+                    params=request.query_params,
+                    headers=dict(request.headers),
+                    data=await request.body(),
+                    timeout=timeout,
+                ) as resp:
+                    body = await resp.read()
+                    await self._record_latency(node_id, start, profile=request_profile)
 
-                return ProxyResult(
-                    socket=socket,
-                    body=body,
-                    status=resp.status,
-                    headers=dict(resp.headers),
-                )
+                    return ProxyResult(
+                        socket=socket,
+                        body=body,
+                        status=resp.status,
+                        headers=dict(resp.headers),
+                    )
         except asyncio.TimeoutError:
-            await self._record_latency(node_id, start, False)
-
+            await self._record_latency(node_id, start, profile=request_profile)
             return ProxyResult(
                 socket=socket,
                 body=b"",
@@ -102,9 +115,8 @@ class ProxyRequestUseCase:
                 headers={},
             )
         except Exception as e:
-            await self._record_latency(node_id, start, False)
+            await self._record_latency(node_id, start, profile=request_profile)
             logger.exception("proxy request failed: %s", e)
-
             return ProxyResult(
                 socket=socket,
                 body=b"",
@@ -112,10 +124,15 @@ class ProxyRequestUseCase:
                 headers={},
             )
 
-    async def _record_latency(self, node_id: str, start: float, success: bool):
+    async def _record_latency(
+        self,
+        node_id: str,
+        start: float,
+        profile: str | None = None,
+    ):
         latency_ms = (time.perf_counter() - start) * 1000
-        if success:
-            latency = latency_ms
-        else:
-            latency = latency_ms * 1.5
-        await self.metrics_repo.add_latency(node_id, latency)
+        await self.metrics_repo.add_latency(
+            node_id=node_id,
+            latency_ms=latency_ms,
+            profile=profile,
+        )

@@ -7,6 +7,7 @@ from asyncio import Task
 from aiohttp import ClientSession, ClientTimeout
 
 from core.application.ports.strategy_provider import StrategyProvider
+from modules.observability.application.services.inflight_tracker import InflightTracker
 from modules.replication.adapters.outbound.registries.completion_strategy_registry import (
     CompletionAlgorithmName,
 )
@@ -21,26 +22,18 @@ from modules.replication.domain.model.execution_result import ExecutionResult
 from modules.replication.domain.model.replication_command import ReplicationCommand
 from modules.replication.domain.model.replication_plan import ReplicationPlan
 from modules.replication.domain.model.replication_target import ReplicationTarget
-from src.modules.replication.domain.completion import (
-    CompletionPolicy,
-    ReplicaReply,
-)
+from src.modules.replication.domain.completion import CompletionPolicy, ReplicaReply
 
 logger = logging.getLogger("replication.runner")
 
 
 class AiohttpReplicationRunner(ReplicationRunner):
-    """Выполняет репликации (hedged / fixed / speculative) по плану.
+    """
+    Строгий replication runner.
 
-    Отвечает за:
-      - запуск HTTP-запросов согласно delay_ms;
-      - применение политики завершения (first/quorum/majority/k-out-of-n);
-      - отмену незавершённых задач;
-      - запись latency победителя в MetricsRepository.
-
-    ВАЖНО:
-    - Политика завершения должна быть выбрана менеджером/планировщиком.
-    - По умолчанию используется FirstValid (k=1), как в tail-latency mitigation.
+    Ключевое отличие:
+    delayed backup-реплика стартует только если target.require_idle=True
+    и соответствующая нода в этот момент idle.
     """
 
     def __init__(
@@ -48,10 +41,12 @@ class AiohttpReplicationRunner(ReplicationRunner):
         client: ClientSession,
         latency_recorder: LatencyRecorder,
         completion_policy_strategy: StrategyProvider[CompletionPolicy],
+        inflight_tracker: InflightTracker,
     ):
         self.client = client
         self.latency_recorder = latency_recorder
         self.completion_policy_strategy = completion_policy_strategy
+        self.inflight_tracker = inflight_tracker
 
     async def execute(
         self,
@@ -60,32 +55,18 @@ class AiohttpReplicationRunner(ReplicationRunner):
         policy_input: CompletionPolicyInput,
         deadline_at: float,
     ) -> ExecutionResult:
-        """Выполняет план репликации.
-
-        Args:
-            cmd: Данные команды репликации
-            plan: План репликации
-            policy_input:
-            deadline_at:
-
-        Returns:
-            Ответ, выбранный политикой завершения.
-
-        Raises:
-            RuntimeError: Если ни одна реплика не дала валидный результат.
-        """
         completion_strategy: CompletionPolicy = self.completion_policy_strategy.get(
             name=policy_input.strategy_name,
             k=policy_input.k,
             n_total=len(plan.targets),
         )
 
-        logger.info(f"Replication targets: {plan.targets}")
+        logger.info("Replication targets: %s", plan.targets)
 
         observed_replies: list[ReplicaReply] = []
         started_nodes: list[str] = []
 
-        tasks: list[Task[ReplicaReply]] = [
+        tasks: list[Task[ReplicaReply | None]] = [
             asyncio.create_task(
                 self._call_one(
                     target=t,
@@ -105,22 +86,27 @@ class AiohttpReplicationRunner(ReplicationRunner):
         }
 
         try:
-            pending: set[Task[ReplicaReply]] = set(tasks)
-            done: set[Task[ReplicaReply]]
+            pending: set[Task[ReplicaReply | None]] = set(tasks)
+
             while pending:
                 remaining = deadline_at - time.perf_counter()
                 if remaining <= 0:
                     break
 
                 done, pending = await asyncio.wait(
-                    pending, timeout=remaining, return_when=asyncio.FIRST_COMPLETED
+                    pending,
+                    timeout=remaining,
+                    return_when=asyncio.FIRST_COMPLETED,
                 )
 
                 if not done:
                     break
 
                 for task in done:
-                    reply: ReplicaReply = await task
+                    reply = await task
+                    if reply is None:
+                        continue
+
                     observed_replies.append(reply)
                     completion_strategy.push(reply)
 
@@ -132,7 +118,11 @@ class AiohttpReplicationRunner(ReplicationRunner):
 
                         if pending:
                             await asyncio.gather(*pending, return_exceptions=True)
-                        await self._record_latencies(observed_replies)
+
+                        await self._record_latencies(
+                            observed_replies,
+                            profile=cmd.profile,
+                        )
 
                         return ExecutionResult(
                             node_id=winner.node_id,
@@ -140,30 +130,39 @@ class AiohttpReplicationRunner(ReplicationRunner):
                             body=winner.raw_body,
                             headers={
                                 **headers,
-                                "X-Winner-Socket": winner.node_id,
+                                "X-Winner-Socket": winner.socket,
                             },
                             latency_ms=winner.latency_ms,
                             started_nodes=started_nodes,
                         )
 
+            for t in pending:
+                t.cancel()
+            await asyncio.gather(*pending, return_exceptions=True)
+
             logger.error(
-                f"Replication failed. "
-                f"Replies collected: {completion_strategy.replies}"
+                "Replication failed. Replies collected: %s",
+                completion_strategy.replies,
             )
-            await self._record_latencies(observed_replies)
+
+            await self._record_latencies(
+                observed_replies,
+                profile=cmd.profile,
+            )
 
             winner = (
                 pick_best(observed_replies, lambda r: r.ok)
-                or pick_best(
-                    observed_replies,
-                    lambda r: 100 <= r.status <= 599 and r.status not in {598, 599},
-                )
+                or pick_best(observed_replies, lambda r: 400 <= r.status < 500)
+                or pick_best(observed_replies, lambda r: 500 <= r.status < 600)
                 or (
                     min(observed_replies, key=lambda r: r.latency_ms)
                     if observed_replies
                     else None
                 )
             )
+
+            logger.warning("FALLBACK used, replies=%s", len(observed_replies))
+
             if winner:
                 if winner.ok:
                     error_kind = "degraded_valid_fallback"
@@ -210,19 +209,20 @@ class AiohttpReplicationRunner(ReplicationRunner):
             if tasks:
                 await asyncio.gather(*tasks, return_exceptions=True)
 
-    async def _record_latencies(self, replies: list[ReplicaReply]) -> None:
+    async def _record_latencies(
+        self,
+        replies: list[ReplicaReply],
+        profile: str | None = None,
+    ) -> None:
+        """
+        Записываем РЕАЛЬНЫЕ latency, без искусственных множителей.
+        """
         for reply in replies:
-            if reply.ok:
-                latency = reply.latency_ms
-            elif 100 <= reply.status <= 599:
-                latency = reply.latency_ms * 2
-            else:
-                continue
-
             try:
                 await self.latency_recorder.record(
                     node_id=reply.node_id,
-                    latency_ms=latency,
+                    latency_ms=reply.latency_ms,
+                    profile=profile,
                 )
             except Exception:
                 logger.exception("failed to record latency for node=%s", reply.node_id)
@@ -234,7 +234,7 @@ class AiohttpReplicationRunner(ReplicationRunner):
         cmd: ReplicationCommand,
         deadline_at: float,
         started_nodes: list[str],
-    ) -> ReplicaReply:
+    ) -> ReplicaReply | None:
         if target.delay_ms > 0:
             await asyncio.sleep(target.delay_ms / 1000.0)
 
@@ -248,6 +248,19 @@ class AiohttpReplicationRunner(ReplicationRunner):
                 latency_ms=0.0,
             )
 
+        if (
+            target.max_inflight is not None
+            and await self.inflight_tracker.is_greater_than_limit(
+                target.node_id, limit=target.max_inflight
+            )
+        ):
+            logger.info(
+                "Skip backup replica to busy node=%s socket=%s",
+                target.node_id,
+                socket,
+            )
+            return None
+
         started_nodes.append(socket)
         logger.info("Create replication on %s", socket)
 
@@ -256,29 +269,30 @@ class AiohttpReplicationRunner(ReplicationRunner):
 
         t0: float = time.perf_counter()
         try:
-            async with self.client.request(
-                method=cmd.method,
-                url=url,
-                params=dict(cmd.query),
-                headers=dict(cmd.headers),
-                data=cmd.body,
-                timeout=timeout,
-            ) as resp:
-                raw: bytes = await resp.read()
-                latency_ms: float = (time.perf_counter() - t0) * 1000.0
+            async with self.inflight_tracker.track(target.node_id):
+                async with self.client.request(
+                    method=cmd.method,
+                    url=url,
+                    params=dict(cmd.query),
+                    headers=dict(cmd.headers),
+                    data=cmd.body,
+                    timeout=timeout,
+                ) as resp:
+                    raw: bytes = await resp.read()
+                    latency_ms: float = (time.perf_counter() - t0) * 1000.0
 
-                ok: bool = 200 <= resp.status < 300 and raw is not None
-                value: str = hashlib.sha256(raw or b"").hexdigest()
+                    ok: bool = 200 <= resp.status < 300 and raw is not None
+                    value: str = hashlib.sha256(raw or b"").hexdigest()
 
-                return ReplicaReply(
-                    node_id=target.node_id,
-                    socket=socket,
-                    ok=ok,
-                    value=value,
-                    raw_body=raw or b"",
-                    status=int(resp.status),
-                    latency_ms=latency_ms,
-                )
+                    return ReplicaReply(
+                        node_id=target.node_id,
+                        socket=socket,
+                        ok=ok,
+                        value=value,
+                        raw_body=raw or b"",
+                        status=int(resp.status),
+                        latency_ms=latency_ms,
+                    )
         except asyncio.TimeoutError:
             return _get_empty_replica_reply(
                 node_id=target.node_id,
@@ -300,7 +314,10 @@ class AiohttpReplicationRunner(ReplicationRunner):
 
 
 def _get_empty_replica_reply(
-    node_id: str, socket: str, latency_ms: float, status: int = 598
+    node_id: str,
+    socket: str,
+    latency_ms: float,
+    status: int = 598,
 ) -> ReplicaReply:
     return ReplicaReply(
         node_id=node_id,
@@ -313,9 +330,6 @@ def _get_empty_replica_reply(
     )
 
 
-def pick_best(
-    replies: list[ReplicaReply],
-    predicate,
-):
+def pick_best(replies: list[ReplicaReply], predicate):
     candidates = [r for r in replies if predicate(r)]
     return min(candidates, key=lambda r: r.latency_ms) if candidates else None

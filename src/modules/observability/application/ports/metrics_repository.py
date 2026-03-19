@@ -12,8 +12,17 @@ class MetricsRepository(Protocol):
 
     async def get_prev(self, node_id: str) -> NodeMetrics | None: ...
 
-    async def add_latency(self, node_id: str, latency_ms: float) -> None: ...
+    async def add_latency(
+        self,
+        node_id: str,
+        latency_ms: float,
+        profile: str | None = None,
+    ) -> None: ...
 
-    async def get_latency_samples(self, node_id: str) -> list[float]: ...
+    async def get_latency_samples(
+        self,
+        node_id: str,
+        profile: str | None = None,
+    ) -> list[float]: ...
 
     async def clear(self) -> None: ...

@@ -9,3 +9,4 @@ class ReplicationCommand:
     query: Mapping[str, str]
     headers: Mapping[str, str]
     body: bytes
+    profile: str | None = None

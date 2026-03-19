@@ -12,7 +12,8 @@ class ReplicationStrategy(Protocol):
         *,
         max_replicas: int,
         tau_ms: int | None = None,
-        latency_samples_per_node: list[list[float]] | None = None
+        latency_samples_per_node: list[list[float]] | None = None,
+        backup_max_inflight: int | None
     ) -> ReplicationPlan:
         """Формирует план репликации.
 
@@ -21,6 +22,7 @@ class ReplicationStrategy(Protocol):
             max_replicas: Верхняя граница числа реплик.
             tau_ms:
             latency_samples_per_node:
+            backup_max_inflight:
 
         Returns:
             ReplicationPlan.

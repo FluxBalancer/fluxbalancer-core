@@ -1,5 +1,3 @@
-import numpy as np
-
 from modules.replication.domain.model.replication_plan import ReplicationPlan
 from modules.replication.domain.model.replication_target import ReplicationTarget
 
@@ -14,67 +12,30 @@ def speculative_execution(
     latency_samples_per_node: list[list[float]] | None = None,
 ) -> ReplicationPlan:
     """
-    Нормальная ступенчатая speculative-стратегия:
-    - первая реплика: сразу
-    - каждая следующая: с накопленной задержкой
-    - дополнительные реплики не стартуют все в один и тот же момент
+    Здесь speculative делаем не эвристическим по p50/p95/p99,
+    а в том же строгом стиле, что и hedged:
+    - первая реплика сразу
+    - следующая через tau_ms
+    - backup запускается только если нода idle (через require_idle=True)
+
+    threshold_ms оставлен в сигнатуре ради совместимости,
+    но реальный порог приходит через tau_ms из planner.
     """
     r_eff = min(replication_max_count, max_replicas, len(ranked))
     if r_eff <= 0:
         return ReplicationPlan(targets=[])
 
+    effective_tau = max(1, int(tau_ms or threshold_ms))
+
     targets: list[ReplicationTarget] = []
-    # fallback
-    if not latency_samples_per_node or len(latency_samples_per_node) == 0:
-        effective_tau = tau_ms or threshold_ms
-        effective_tau = max(1, int(effective_tau))
-
-        for i, (nid, h, p) in enumerate(ranked[:r_eff]):
-            delay = i * effective_tau
-            targets.append(
-                ReplicationTarget(
-                    node_id=nid,
-                    host=h,
-                    port=p,
-                    delay_ms=delay,
-                )
-            )
-        return ReplicationPlan(targets=targets)
-
-    primary_samples = np.asarray(latency_samples_per_node[0], dtype=float)
-    primary_samples = primary_samples[np.isfinite(primary_samples)]
-    primary_samples = primary_samples[primary_samples > 0]
-
-    if primary_samples.size == 0:
-        base_delay = tau_ms or threshold_ms
-    else:
-        p50 = float(np.percentile(primary_samples, 50))
-        p95 = float(np.percentile(primary_samples, 95))
-        p99 = float(np.percentile(primary_samples, 99))
-
-        tail_ratio = (p95 - p50) / max(p50, 1.0)
-
-        if tail_ratio > 1.0:
-            base_delay = 0.5 * p50
-        elif tail_ratio > 0.5:
-            base_delay = 0.7 * p50
-        else:
-            base_delay = 0.9 * p50
-
-        base_delay = min(base_delay, 0.8 * p99)
-
-    base_delay = max(1, int(base_delay))
-
-    # --- строим план ---
     for i, (nid, h, p) in enumerate(ranked[:r_eff]):
-        delay = int(i * base_delay)
-
         targets.append(
             ReplicationTarget(
                 node_id=nid,
                 host=h,
                 port=p,
-                delay_ms=delay,
+                delay_ms=i * effective_tau,
+                require_idle=(i > 0),
             )
         )
 
