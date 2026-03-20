@@ -11,8 +11,10 @@ from modules.replication.adapters.outbound.registries.replication_strategy_regis
 )
 from modules.replication.adapters.outbound.strategies.base import ReplicationStrategy
 from modules.replication.domain.model.replication_plan import ReplicationPlan
+from modules.replication.domain.policies.adaptive_replication_selector_policy import AdaptiveReplicationSelector
 from modules.replication.domain.policies.replication_policy import ReplicationDecision
 from modules.replication.domain.policies.replication_policy import ReplicationPolicy
+from modules.replication.domain.services.work_amplification.universal_wa import UniversalWAEstimator
 from src.modules.routing.application.usecase.choose_node import ChooseNodeUseCase
 
 logger = logging.getLogger("replication.planner")
@@ -31,17 +33,27 @@ class PlannerConfig:
     min_samples:
         Минимум наблюдений, после которого можно доверять эмпирическому квантилю.
 
-    max_tail_replicas:
+    max_adaptive_replicas:
         Для уменьшения tail latency при completion=first достаточно primary + 1 backup.
         Большее число реплик резко увеличивает work amplification.
     """
 
-    # hedge_quantile: float = 84 # p99 = [1.34; 13.75]
-    hedge_quantile: float = 83
-    min_samples: int = 32
-    max_tail_replicas: int = 4
+    lambda_cost: float = 0.15
+    adaptive_min_samples: int = 16
 
-    backup_max_inflight: int = 4
+    # hedge_quantile: float = 84 # p99 ci95 = [-0.22; 9.94] -- wa=1.186 -- 4 версия  ::: score = 4.09
+    # hedge_quantile: float = 65 # p99 ci95 = [9.06; 14.61] -- wa=1.496 -- 6 версия  ::: score = 7.91
+    # hedge_quantile: float = 50 # p99 ci95 = [6.45; 17.51] -- wa=1.548 -- 7 версия  ::: score = 7.74
+    # hedge_quantile: float = 40 # p99 ci95 = [8.97 – 19.87] -- wa=1.571 -- 8 версия  ::: score = 9.17
+    # hedge_quantile: float = 30 # p99 ci95 = [2.9; 23.3] -- wa=1.619 -- 9 версия  ::: score = 8.09
+    # hedge_quantile: float = 38
+
+    hedge_quantile: float = 39
+
+    min_samples: int = 16
+    max_adaptive_replicas: int = 3
+
+    backup_max_inflight: int = 6
 
 
 class ReplicationPlanner:
@@ -58,13 +70,13 @@ class ReplicationPlanner:
     """
 
     def __init__(
-        self,
-        chooser: ChooseNodeUseCase,
-        policy: ReplicationPolicy,
-        strategy_registry: StrategyProvider[ReplicationStrategy],
-        metrics_repository: MetricsRepository,
-        *,
-        config: PlannerConfig = PlannerConfig(),
+            self,
+            chooser: ChooseNodeUseCase,
+            policy: ReplicationPolicy,
+            strategy_registry: StrategyProvider[ReplicationStrategy],
+            metrics_repository: MetricsRepository,
+            *,
+            config: PlannerConfig = PlannerConfig(),
     ):
         self.metrics_repository = metrics_repository
         self.chooser = chooser
@@ -73,9 +85,9 @@ class ReplicationPlanner:
         self.config = config
 
     async def build(
-        self,
-        brs: BRSRequest,
-        request_profile: str | None = None,
+            self,
+            brs: BRSRequest,
+            request_profile: str | None = None,
     ) -> ReplicationPlan:
         ranked: list[tuple[str, str, int]] = await self.chooser.rank_nodes(
             brs,
@@ -107,7 +119,7 @@ class ReplicationPlanner:
                 max_replicas=base_replication_count,
                 tau_ms=None,
                 latency_samples_per_node=None,
-                backup_max_inflight=None
+                backup_max_inflight=None,
             )
             plan.r_eff = len(plan.targets)
             return plan
@@ -132,16 +144,23 @@ class ReplicationPlanner:
                 max_replicas=1,
                 tau_ms=None,
                 latency_samples_per_node=None,
-                backup_max_inflight=None
+                backup_max_inflight=None,
             )
 
         # Число реплик, которые вообще могут стартовать до дедлайна.
-        max_r_by_deadline = 1 + max(
-            0, (int(brs.deadline_ms) - 1) // max(1, hedge_delay_ms)
-        )
-        effective_replication_count = min(base_replication_count, max_r_by_deadline)
+        deadline_ms = int(brs.deadline_ms)
+        effective_delay = max(1, int(hedge_delay_ms))
 
-        ranked_cut = ranked[:effective_replication_count]
+        launch_horizon_ms = max(1, int(deadline_ms * 0.75))
+
+        max_r_by_deadline = 1 + ((launch_horizon_ms - 1) // effective_delay)
+        hard_cap = min(
+            base_replication_count,
+            max_r_by_deadline,
+            self.config.max_adaptive_replicas
+        )
+
+        ranked_cut = ranked[:hard_cap]
 
         latency_samples_per_node: list[list[float]] = []
         for node_id, _, _ in ranked_cut:
@@ -152,12 +171,33 @@ class ReplicationPlanner:
             node_samples = self._sanitize_samples(node_samples)
             latency_samples_per_node.append(node_samples)
 
+        if (
+            brs.replications_adaptive
+            and len(ranked_cut) >= 2
+            and all(len(samples) >= self.config.adaptive_min_samples for samples in latency_samples_per_node)
+        ):
+            delays_ms: list[int] = [i * effective_delay for i in range(len(ranked_cut))]
+            wa_estimator = UniversalWAEstimator(
+                latency_samples_per_node=latency_samples_per_node
+            )
+            selector = AdaptiveReplicationSelector(
+                lambda_cost=self.config.lambda_cost,
+                wa_estimator=wa_estimator,
+            )
+            effective_replication_count = selector.choose_r(
+                samples_per_node=latency_samples_per_node,
+                r_max=hard_cap,
+                delays_ms=delays_ms,
+            )
+        else:
+            effective_replication_count = hard_cap
+
         plan = await strategy.build(
             ranked_cut,
             max_replicas=effective_replication_count,
-            tau_ms=hedge_delay_ms,
+            tau_ms=effective_delay,
             latency_samples_per_node=latency_samples_per_node,
-            backup_max_inflight=self.config.backup_max_inflight
+            backup_max_inflight=self.config.backup_max_inflight,
         )
         plan.r_eff = len(plan.targets)
 
@@ -165,17 +205,17 @@ class ReplicationPlanner:
             "replication plan: strategy=%s deadline_ms=%s hedge_delay_ms=%s targets=%s",
             strategy_name,
             brs.deadline_ms,
-            hedge_delay_ms,
-            [(t.node_id, t.delay_ms, t.require_idle) for t in plan.targets],
+            effective_delay,
+            [(t.node_id, t.delay_ms) for t in plan.targets],
         )
 
         return plan
 
     async def _estimate_backup_delay_ms(
-        self,
-        *,
-        node_id: str,
-        request_profile: str | None,
+            self,
+            *,
+            node_id: str,
+            request_profile: str | None,
     ) -> int | None:
         """
         Оценка порога backup-запуска.

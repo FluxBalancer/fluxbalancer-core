@@ -10,6 +10,7 @@ def speculative_execution(
     max_replicas: int,
     tau_ms: int,
     latency_samples_per_node: list[list[float]] | None = None,
+    backup_max_inflight: int | None = None,
 ) -> ReplicationPlan:
     """
     Здесь speculative делаем не эвристическим по p50/p95/p99,
@@ -35,7 +36,7 @@ def speculative_execution(
                 host=h,
                 port=p,
                 delay_ms=i * effective_tau,
-                require_idle=(i > 0),
+                max_inflight=(backup_max_inflight if i > 0 else None),
             )
         )
 

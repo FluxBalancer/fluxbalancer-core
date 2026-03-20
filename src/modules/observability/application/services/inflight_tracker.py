@@ -31,9 +31,6 @@ class InflightTracker:
         async with self._lock:
             return self._counts.get(node_id, 0)
 
-    async def is_idle(self, node_id: str) -> bool:
-        return (await self.get(node_id)) == 0
-
     async def is_greater_than_limit(self, node_id: str, limit: int) -> bool:
         current = await self.get(node_id)
         return current > limit

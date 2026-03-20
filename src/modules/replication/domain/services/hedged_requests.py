@@ -27,7 +27,6 @@ def hedged_requests(
                 host=h,
                 port=p,
                 delay_ms=delay,
-                require_idle=(i > 0),
                 max_inflight=(backup_max_inflight if i > 0 else None),
             )
         )
