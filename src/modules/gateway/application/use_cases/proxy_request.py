@@ -112,7 +112,9 @@ class ProxyRequestUseCase:
                 socket=socket,
                 body=b"",
                 status=504,
-                headers={},
+                headers={
+                    "X-Balancer-Error": "deadline_exceeded"
+                },
             )
         except Exception as e:
             await self._record_latency(node_id, start, profile=request_profile)
@@ -121,7 +123,9 @@ class ProxyRequestUseCase:
                 socket=socket,
                 body=b"",
                 status=500,
-                headers={},
+                headers={
+                    "X-Balancer-Error": "degraded_error_fallback"
+                },
             )
 
     async def _record_latency(
