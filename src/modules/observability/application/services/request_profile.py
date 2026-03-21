@@ -27,13 +27,7 @@ def _seconds_bucket(seconds: float | None) -> str:
     if seconds is None:
         return "unknown"
 
-    if seconds <= 1.5:
-        return "xs"
-    if seconds <= 3.0:
-        return "s"
-    if seconds <= 6.0:
-        return "m"
-    return "l"
+    return str(int(seconds))
 
 
 def build_request_profile(path: str, query: Mapping[str, Any] | None) -> str:
@@ -41,14 +35,18 @@ def build_request_profile(path: str, query: Mapping[str, Any] | None) -> str:
     query = query or {}
 
     seconds = _safe_float(query.get("seconds"))
-    seconds_key = f"{seconds:.2f}" if seconds is not None else "unknown"
+    bucket = _seconds_bucket(seconds)
 
     if endpoint == "cpu":
-        return f"cpu:{seconds_key}"
+        return f"cpu:{bucket}"
 
     if endpoint == "mem":
         mb = _safe_float(query.get("mb"))
-        mb_key = f"{mb:.0f}" if mb is not None else "unknown"
-        return f"mem:{seconds_key}:{mb_key}"
+        mb_bucket = (
+            "low" if mb is not None and mb < 128 else
+            "mid" if mb is not None and mb < 512 else
+            "high"
+        )
+        return f"mem:{bucket}:{mb_bucket}"
 
     return endpoint

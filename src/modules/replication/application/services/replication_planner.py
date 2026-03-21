@@ -38,7 +38,7 @@ class PlannerConfig:
         Большее число реплик резко увеличивает work amplification.
     """
 
-    lambda_cost: float = 0.25
+    lambda_cost: float = 0.5
     adaptive_min_samples: int = 8
 
     # hedge_quantile: float = 84 # p99 ci95 = [-0.22; 9.94] -- wa=1.186 -- 4 версия  ::: score = 4.09
@@ -49,13 +49,15 @@ class PlannerConfig:
     # hedge_quantile: float = 38 # p99 ci95 = [] -- wa= --  версия  ::: score
     # hedge_quantile: float = 39 # p99 ci95 = [9.58; 15.21] -- wa=1.679 -- 12 версия  ::: score = 7.509
                                  # p99 ci95 = [8.5 ; 15.02] -- wa=1.602 -- 12 версия  ::: score = 7.342 (adaptive)
-    hedge_quantile: float = 41 # p99 ci95 = [14.61; 19.61] -- wa=1.679 -- 13 версия  ::: score = 10.18
-                               # p99 ci95 = [13.87; 22.07] -- wa=1.509 -- 13 версия  ::: score = 11.9 (adaptive)
+    # hedge_quantile: float = 41 # p99 ci95 = [14.61; 19.61] -- wa=1.679 -- 13 версия  ::: score = 10.18
+    #                            # p99 ci95 = [13.87; 22.07] -- wa=1.509 -- 13 версия  ::: score = 11.9 (adaptive)
+
+    hedge_quantile: float = 40 # p99 ci95 = [] -- wa= -- 14 версия  ::: score =
 
     min_samples: int = 16
     max_adaptive_replicas: int = 3
 
-    backup_max_inflight: int = 6
+    backup_max_inflight: int = 8
 
 
 class ReplicationPlanner:
