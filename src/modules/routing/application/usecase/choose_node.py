@@ -54,9 +54,10 @@ class ChooseNodeUseCase(ChooseNodePort):
         brs: BRSRequest,
         request_profile: str | None = None,
     ) -> list[tuple[str, str, int]]:
-        """Ранжирует узлы и возвращает список endpoint'ов (лучший→худший).
+        """Ранжирует узлы и возвращает список endpoint'ов (лучший -> худший).
 
         Args:
+            request_profile:
             brs: Параметры запроса BRS.
 
         Returns:
