@@ -28,10 +28,12 @@ def test_choose_node_e2e():
         sleep(1)
         resp: Response = client.get(
             f"/cpu?seconds={seconds}&fail_rate=0&slow_rate=0&jitter_mean=0&extra_delay_prob=0",
-            headers={"X-Balancer-Deadline": "2000"}
+            headers={"X-Balancer-Deadline": "2000"},
         )
         assert resp.status_code == 200
 
         answer = ServerCPUResponse(**resp.json())
         assert answer.cpu_burn is True
-        assert abs(answer.seconds - seconds * 1000.0) < 400  # разница по времени менее 400мс
+        assert (
+            abs(answer.seconds - seconds * 1000.0) < 400
+        )  # разница по времени менее 400мс

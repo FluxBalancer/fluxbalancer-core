@@ -25,16 +25,19 @@ class FakeDecisionPolicy(DecisionResolverPolicy):
 
 
 @pytest.mark.asyncio
-async def test_choose_node_returns_best():
+async def test_choose_node_uses_global_latency_when_profile_has_no_samples():
     metrics_repo = AsyncMock()
     metrics_repo.list_latest.return_value = [
-        NodeMetrics("t", "node1", 0.9, 0.9, 0, 0, 200),  # хуже
-        NodeMetrics("t", "node2", 0.1, 0.1, 0, 0, 50),  # лучше
+        NodeMetrics("t", "node1", 0.3, 0.3, 0, 0, 200),
+        NodeMetrics("t", "node2", 0.2, 0.2, 0, 0, 50),
     ]
     metrics_repo.get_prev.return_value = None
+
     metrics_repo.get_latency_samples.side_effect = [
-        [200, 210, 220],  # node1
-        [50, 60, 70],  # node2
+        [],  # node1, profile samples
+        [200, 210, 220],  # node1, global samples
+        [],  # node2, profile samples
+        [50, 60, 70],  # node2, global samples
     ]
 
     node_registry = Mock()
@@ -48,6 +51,7 @@ async def test_choose_node_returns_best():
         node_registry=node_registry,
         decision_policy=FakeDecisionPolicy(),
     )
+
     result = await uc.execute(
         brs=BRSRequest(
             service=None,
@@ -60,6 +64,9 @@ async def test_choose_node_returns_best():
             completion_strategy_name=None,
             completion_k=None,
             replications_adaptive=None,
-        )
+        ),
+        request_profile="cpu:1",
     )
+
     assert result[0] == "node2"
+    assert metrics_repo.get_latency_samples.await_count == 4

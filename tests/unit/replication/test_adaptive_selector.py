@@ -1,7 +1,11 @@
 import pytest
 
-from modules.replication.domain.services.adaptive_selecctor import adaptive_selector_replicas
-from modules.replication.domain.services.work_amplification.universal_wa import UniversalWAEstimator
+from modules.replication.domain.services.adaptive_selecctor import (
+    adaptive_selector_replicas,
+)
+from modules.replication.domain.services.work_amplification.universal_wa import (
+    UniversalWAEstimator,
+)
 
 R_MAX = 3
 
@@ -12,7 +16,7 @@ R_MAX = 3
         (0.5, lambda r: 1 <= r <= R_MAX),
         (0, lambda r: r == R_MAX),
         (float("inf"), lambda r: r == 1),
-    ]
+    ],
 )
 def test_adaptive_selector_returns_valid_r(lambda_cost, expected):
     samples = [

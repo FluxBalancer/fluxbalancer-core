@@ -1,4 +1,7 @@
-from modules.replication.domain.policies.replication_policy import ReplicationPolicy, ReplicationDecision
+from modules.replication.domain.policies.replication_policy import (
+    ReplicationPolicy,
+    ReplicationDecision,
+)
 
 
 def test_default_replicas():

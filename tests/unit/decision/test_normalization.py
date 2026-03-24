@@ -5,11 +5,14 @@ from modules.types.numpy import Matrix
 
 
 def test_normalize_cost_range():
-    X: Matrix = np.array([
-        [10, 100],
-        [20, 200],
-        [30, 300],
-    ], dtype=float)
+    X: Matrix = np.array(
+        [
+            [10, 100],
+            [20, 200],
+            [30, 300],
+        ],
+        dtype=float,
+    )
 
     Y: Matrix = normalize_cost(X)
 
@@ -20,13 +23,16 @@ def test_normalize_cost_range():
 
 
 def test_normalize_cost_zero_division():
-    X: Matrix = np.array([
-        [1, 1],
-        [1, 1],
-        [1, 1],
-        [1, 1],
-        [1, 1],
-    ], dtype=float)
+    X: Matrix = np.array(
+        [
+            [1, 1],
+            [1, 1],
+            [1, 1],
+            [1, 1],
+            [1, 1],
+        ],
+        dtype=float,
+    )
 
     Y: Matrix = normalize_cost(X)
 
@@ -35,11 +41,14 @@ def test_normalize_cost_zero_division():
 
 
 def test_normalize_double_cost_zero():
-    X: Matrix = np.array([
-        [1, 1],
-        [2, 2],
-        [1, 1],
-    ], dtype=float)
+    X: Matrix = np.array(
+        [
+            [1, 1],
+            [2, 2],
+            [1, 1],
+        ],
+        dtype=float,
+    )
 
     Y: Matrix = normalize_cost(X)
 
