@@ -1,3 +1,5 @@
+from contextlib import asynccontextmanager
+
 import uvicorn
 from fastapi import FastAPI
 
@@ -13,7 +15,12 @@ setup_logging()
 def create_app() -> FastAPI:
     module = RoutingModule()
 
-    app = FastAPI(lifespan=lambda app_: lifespan(app_, module))
+    @asynccontextmanager
+    async def app_lifespan(app: FastAPI):
+        async with lifespan(app, module):
+            yield
+
+    app = FastAPI(lifespan=app_lifespan)
 
     app.include_router(
         ChooseNodeRouter(
